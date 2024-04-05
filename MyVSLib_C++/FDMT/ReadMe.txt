@@ -7,6 +7,9 @@ CFdmtC *pfdmt = new CFdmtC(
 	,  cols		
         ,  imaxDt // quantity of rows of output image
         );
+
+Do not forget to delete the instance:
+delete pfdmt;
 2. How to call calculations:
 pfdmt->process_image(piarrImage, piarrImOut, false);
 
@@ -19,6 +22,6 @@ piarrImOut - one-dimentional array type of fdmt_type_, imaxDt = nchan*cols
 
 fdmt_type_ defines in Constants.h
 
-3. If you need to calculate nomalizing array applay the following call:
+3. If you need to calculate normalizing array applay the following call:
 pfdmt->process_image(NULL, piarrImOut, true);  
 
