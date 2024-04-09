@@ -285,7 +285,9 @@ int main(int argc, char* argv[])
     checkCudaErrors(cudaMemcpy(ddm, dm, sizeof(float) * ndm, cudaMemcpyHostToDevice));
 
     // Generate FFT plan (batch in-place forward FFT)
-    idist = nbin;  odist = nbin;  iembed = nbin;  oembed = nbin;  istride = 1;  ostride = 1;
+    idist = nbin;  odist = nbin;  iembed = nbin;  oembed = nbin;  istride = 1;  ostride = 1; 
+
+    checkCudaErrors(cufftPlanMany(&ftc2cf, 1, &nbin, &iembed, istride, idist, &oembed, ostride, odist, CUFFT_C2C, nfft * nsub));
     //cufftPlanMany(&ftc2cf,            // Plan handle
     //    1,                   // Rank (number of dimensions in the transform)
     //    &nbin,               // Dimensions of the transform =32768 = 1<<15
@@ -299,8 +301,6 @@ int main(int argc, char* argv[])
     //                           of successive batches)    =32768
     //    CUFFT_C2C,           // Type of transform (in this case, complex to complex)
     //    nfft * nsub);        // Number of FFTs (batch size) = 100 * 20
-
-    checkCudaErrors(cufftPlanMany(&ftc2cf, 1, &nbin, &iembed, istride, idist, &oembed, ostride, odist, CUFFT_C2C, nfft * nsub));
 
     // Generate FFT plan (batch in-place backward FFT)
     idist = mbin;  odist = mbin;  iembed = mbin;  oembed = mbin;  istride = 1;  ostride = 1;

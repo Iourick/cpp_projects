@@ -105,7 +105,6 @@
     <CudaCompile Include="..\MyVSLib_C++\Cleaning.cu" />
     <CudaCompile Include="..\MyVSLib_C++\Detection.cu" />
     <CudaCompile Include="..\MyVSLib_C++\FdmtU.cu" />
-    <CudaCompile Include="..\MyVSLib_C++\Fragment.cu" />
     <CudaCompile Include="..\MyVSLib_C++\LofarSession.cu" />
     <CudaCompile Include="kernel.cu" />
   </ItemGroup>
@@ -119,7 +118,7 @@
     <ClInclude Include="..\MyVSLib_C++\Detection.cuh" />
     <ClInclude Include="..\MyVSLib_C++\DrawImg.h" />
     <ClInclude Include="..\MyVSLib_C++\FdmtU.cuh" />
-    <ClInclude Include="..\MyVSLib_C++\Fragment.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\Fragment.h" />
     <ClInclude Include="..\MyVSLib_C++\TelescopeHeader.h" />
     <ClInclude Include="..\MyVSLib_C++\LofarSession.cuh" />
     <ClInclude Include="..\MyVSLib_C++\OutChunkHeader.h" />
@@ -132,6 +131,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\MyVSLib_C++\DrawImg.cpp" />
+    <ClCompile Include="..\MyVSLib_C++\Fragment.cpp" />
     <ClCompile Include="..\MyVSLib_C++\TelescopeHeader.cpp" />
     <ClCompile Include="..\MyVSLib_C++\OutChunkHeader.cpp" />
     <ClCompile Include="..\MyVSLib_C++\yr_cart.cpp" />

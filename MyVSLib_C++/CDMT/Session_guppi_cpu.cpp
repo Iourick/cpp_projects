@@ -86,7 +86,7 @@ bool CSession_guppi_cpu::allocateInputMemory(void** parrInput, const int QUantDo
 //----------------------------------------------------------
 
 void CSession_guppi_cpu::createChunk(CChunkB** ppchunk
-    ,const float Fmin
+    , const float Fmin
     , const float Fmax
     , const int npol
     , const int nchan
@@ -101,7 +101,8 @@ void CSession_guppi_cpu::createChunk(CChunkB** ppchunk
     , const int length_sum_wnd
     , const int nbin
     , const int nfft
-    , const int noverlap)
+    , const int noverlap
+    , const float tsamp)
 {    
         CChunk_cpu* chunk  = new CChunk_cpu(Fmin
         ,  Fmax
@@ -118,6 +119,7 @@ void CSession_guppi_cpu::createChunk(CChunkB** ppchunk
         , length_sum_wnd
         , nbin
         , nfft
-        , noverlap);
+        , noverlap
+        , tsamp);
         *ppchunk = chunk;
 }

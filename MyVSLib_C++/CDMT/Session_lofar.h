@@ -52,7 +52,7 @@ public:
 	virtual bool allocateInputMemory(void** parrInput, const int QUantDownloadingBytesForChunk, void** pcmparrRawSignalCur
 		, const int QUantChunkComplexNumbers);
 
-	virtual void createChunk(CChunkB** ppchunk
+	virtual void  createChunk(CChunkB** ppchunk
 		, const float Fmin
 		, const float Fmax
 		, const int npol
@@ -68,7 +68,8 @@ public:
 		, const int length_sum_wnd
 		, const int nbin
 		, const int nfft
-		, const int noverlap);
+		, const int noverlap
+		, const float tsamp);
 
 	virtual void freeInputMemory(void* parrInput, void* pcmparrRawSignalCur);
 

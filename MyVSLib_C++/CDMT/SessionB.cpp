@@ -180,13 +180,7 @@ int CSessionB::launch()
     
     
     int ncoherent   = get_coherent_dms();
-    const float coh_dm_step = m_d_max / ncoherent;
-    int kk= (m_d_max - m_d_min) / coh_dm_step;
-    std::vector<int>  vct_coh_dm(kk);
-    for (int i = 0; i < kk; ++i) {
-        vct_coh_dm[i] = m_d_min + i * coh_dm_step;
-    }
-
+    
     CChunkB* pChunk= new  CChunkB();
     CChunkB** ppChunk = &pChunk;    
     createChunk(ppChunk
@@ -205,7 +199,8 @@ int CSessionB::launch()
         , m_length_sum_wnd
         , m_nbin
         , m_nfft
-        , Noverlap);
+        , Noverlap
+       , m_header.m_tresolution );
     
    
     FILE** prb_File = (FILE**)malloc( sizeof(FILE*));
@@ -306,7 +301,8 @@ void CSessionB::createChunk(CChunkB** ppchunk
     , const int length_sum_wnd
     , const int nbin
     , const int nfft
-    , const int noverlap)
+    , const int noverlap
+    , const float tsamp)
 {   
 }
 

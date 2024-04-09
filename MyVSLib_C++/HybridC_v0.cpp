@@ -40,7 +40,15 @@ fftwf_plan create_wis(const unsigned int size,char*str, const bool bforward)
 	fftwf_plan plan = NULL;
 	if (bforward)
 	{
-		plan = fftwf_plan_dft_1d(size, in, out, FFTW_FORWARD, FFTW_MEASURE);
+		int size0 = size;
+		plan = fftwf_plan_many_dft(1, &size0, 1,
+			in, &size0,
+			1, size,
+			out, &size0,
+			1, size,
+			FFTW_FORWARD, FFTW_MEASURE);
+		
+		//plan = fftwf_plan_dft_1d(size, in, out, FFTW_FORWARD, FFTW_MEASURE);
 	}
 	else
 	{

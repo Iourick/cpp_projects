@@ -475,7 +475,8 @@ void CSession_guppi::createChunk(CChunkB** ppchunk
     , const int length_sum_wnd
     , const int nbin
     , const int nfft
-    , const int noverlap)
+    , const int noverlap
+    , const float tsamp)
 {
 }
 //----------------------------------------------------------------

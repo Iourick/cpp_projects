@@ -94,6 +94,7 @@ CChunkB::CChunkB()
 	m_nbin = 0;
 	m_nfft = 0;
 	m_noverlap = 0;
+	m_tsamp = 0.;
 }
 //-----------------------------------------------------------
 
@@ -115,7 +116,7 @@ CChunkB::CChunkB(const  CChunkB& R)
 	m_nfft = R.m_nfft;
 	m_noverlap = R.m_noverlap;
 	m_ncoherent = R.m_ncoherent;
-
+	m_tsamp = R.m_tsamp;
 }
 //-------------------------------------------------------------------
 
@@ -141,6 +142,7 @@ CChunkB& CChunkB::operator=(const CChunkB& R)
 	m_nfft = R.m_nfft;
 	m_noverlap = R.m_noverlap;
 	m_ncoherent = R.m_ncoherent;
+	m_tsamp = R.m_tsamp;
 	return *this;
 }
 //------------------------------------------------------------------
@@ -162,6 +164,7 @@ CChunkB::CChunkB(
 	, const int nbin
 	, const int nfft
 	, const int noverlap
+	,const float tsamp
 )
 {
 	m_Fmin = Fmin;
@@ -183,6 +186,7 @@ CChunkB::CChunkB(
 	m_nbin = nbin;
 	m_nfft = nfft;
 	m_noverlap = noverlap;
+	m_tsamp = tsamp;
 }
 
 //
@@ -194,11 +198,18 @@ bool CChunkB::process(void* pcmparrRawSignalCur
 	
 	return true;
 }
+////-------------------------------------------------
+//
+//int  CChunkB::get_coherent_dms()
+//{
+//	// Compute the coherent DMs for the FDMT algorithm.
+//	
+//	
+//	float    t_d = 4.148808e3 * m_Fmax * (1.0 / (m_Fmin * m_Fmin) - 1.0 / (m_Fmax * m_Fmax));
+//	int irez = ceil(t_d * m_header.m_tresolution / (m_pulse_length * m_pulse_length));
+//	return irez;
+//}
 
-bool CChunkB::try0()
-{
-	return false;
-}
 //-----------------------------------------------------------------
 //
 //long long CChunkB::calcLenChunk_(CTelescopeHeader header, const int nsft

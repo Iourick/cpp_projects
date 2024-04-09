@@ -131,7 +131,8 @@ public:
 		, const int length_sum_wnd
 		, const int nbin
 		, const int nfft
-		, const int noverlap);
+		, const int noverlap
+		, const float tsamp);
 
 	virtual void  shift_file_pos(FILE** prb_File, const int IShift);
 

@@ -29,6 +29,7 @@ public:
 		, const unsigned int len_sft
 		, const int Block_id
 		, const int Chunk_id
+
 		, const double d_max
 		, const double d_min
 		, const int ncoherent
@@ -37,6 +38,7 @@ public:
 		, const int nbin
 		, const int nfft
 		, const int noverlap
+		, const float tsamp
 	);
 
 	//--------------------------------------------------------
@@ -52,12 +54,12 @@ public:
 	unsigned int m_nchan;
 
 	// length of time series of each channel
-	//unsigned int m_lenChunk;
+	
 	unsigned m_lenChunk;
 
 	unsigned int m_len_sft;
 
-	//float m_pulse_length;
+	float m_tsamp;
 
 	int m_Chunk_id;
 
@@ -97,7 +99,8 @@ public:
 
 	void set_blockid(const int nC);
 
-	virtual bool try0();
+	//int get_coherent_dms();
+	
 
 	static void cutQuadraticFragment(float* parrFragment, float* parrInpImage, int* piRowBegin, int* piColBegin
 		, const int QInpImageRows, const int QInpImageCols, const int NUmTargetRow, const int NUmTargetCol);

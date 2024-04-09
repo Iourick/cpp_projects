@@ -37,6 +37,7 @@ public:
 		, const int nbin
 		, const int nfft
 		, const int noverlap
+		, const float tsamp
 	);
 
 	//-------------------------------------------------------------------------

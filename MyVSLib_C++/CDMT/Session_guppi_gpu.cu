@@ -87,7 +87,8 @@ void CSession_guppi_gpu::createChunk(CChunkB** ppchunk
     , const int length_sum_wnd
     , const int nbin
     , const int nfft
-    , const int noverlap)
+    , const int noverlap
+    , const float tsamp)
 {   
         CChunk_gpu* chunk = new CChunk_gpu(Fmin
             , Fmax
@@ -104,7 +105,8 @@ void CSession_guppi_gpu::createChunk(CChunkB** ppchunk
             , length_sum_wnd
             , nbin
             , nfft
-            , noverlap);
+            , noverlap
+            , tsamp);
     *ppchunk = chunk;
 }
 

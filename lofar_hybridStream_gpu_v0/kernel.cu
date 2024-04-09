@@ -21,7 +21,7 @@
 #include "Constants.h"
 #include "LofarSession.cuh"
 #include "OutChunkHeader.h"
-#include "Fragment.cuh"
+#include "Fragment.h"
 
 
 #ifdef _WIN32 // Windows

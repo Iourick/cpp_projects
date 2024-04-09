@@ -114,7 +114,8 @@
 		, const int length_sum_wnd
 		, const int nbin
 		, const int nfft
-		, const int noverlap) : CChunkB(Fmin
+		, const int noverlap
+		, const float tsamp) : CChunkB(Fmin
 			, Fmax
 			, npol
 			, nchan
@@ -129,7 +130,8 @@
 			, length_sum_wnd
 			, nbin
 			, nfft
-			, noverlap)
+			, noverlap
+			, tsamp)
 	{
 	}
 

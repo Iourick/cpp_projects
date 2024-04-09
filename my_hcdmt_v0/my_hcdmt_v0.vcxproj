@@ -146,6 +146,7 @@ copy "D:\cpp_projects\Dependencies\freeglut\bin\$(Platform)" "$(OutDir)"</Comman
     <ClCompile Include="..\MyVSLib_C++\CDMT\ChunkB.cpp" />
     <ClCompile Include="..\MyVSLib_C++\CDMT\Chunk_cpu.cpp" />
     <ClCompile Include="..\MyVSLib_C++\CDMT\SessionB.cpp" />
+    <ClCompile Include="..\MyVSLib_C++\CDMT\Session_guppi.cpp" />
     <ClCompile Include="..\MyVSLib_C++\CDMT\Session_guppi_cpu.cpp" />
     <ClCompile Include="..\MyVSLib_C++\CDMT\Session_lofar.cpp" />
     <ClCompile Include="..\MyVSLib_C++\CDMT\Session_lofar_cpu.cpp" />
@@ -153,7 +154,6 @@ copy "D:\cpp_projects\Dependencies\freeglut\bin\$(Platform)" "$(OutDir)"</Comman
     <ClCompile Include="..\MyVSLib_C++\FDMT\FdmtCpu.cpp" />
     <ClCompile Include="..\MyVSLib_C++\Fragment.cpp" />
     <ClCompile Include="..\MyVSLib_C++\yr_cart.cpp" />
-    <ClCompile Include="Session_guppi.cpp" />
     <CudaCompile Include="..\MyVSLib_C++\CDMT\Session_lofar_gpu.cu">
       <FileType>Document</FileType>
     </CudaCompile>
