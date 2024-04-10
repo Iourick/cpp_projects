@@ -41,9 +41,9 @@ using namespace std;
 
 int main(int argc, char** argv)
 {  
-    const int leng = 11;
-    int iarr[11];
-    float arr[11];
+    const int leng =5;
+    int iarr[5];
+    float arr[5];
 
     // Fill the array with natural numbers
     for (int i = 0; i < leng; ++i) {
@@ -52,7 +52,7 @@ int main(int argc, char** argv)
     }
 
     
-    Class::roll_(arr, 11, 1);
+    Class::roll_(arr, 5,2);
     std::cout << "Array of natural numbers arr:" << std::endl;
     for (int i = 0; i < leng; ++i) {
         std::cout << arr[i] << " ";

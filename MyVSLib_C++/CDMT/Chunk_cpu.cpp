@@ -5,6 +5,7 @@
 #include <cmath>
 #include <fftw3.h>
 #include "npy.hpp"
+#include "FdmtCpu.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -170,6 +171,10 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur	, std::vector<COutChunkHeader
 	float* parr_wfall = (float*)malloc(sizeof(float) * msamp * m_nchan * m_len_sft);
 	// 4. main loop
 	fftwf_complex* parr_ffted = (fftwf_complex*)pcmparrRawSignalCur;
+	float* parr_fdmt_res = (float*)malloc(m_len_sft * m_nchan * msamp * sizeof(float));
+	float* parr_fdmt_norm = (float*)malloc(m_len_sft * m_nchan * msamp * sizeof(float));
+
+
 	for (int idm = 0; idm < m_coh_dm_Vector.size(); ++idm)
 	{
 		// 5. elementwise multiplication
@@ -234,16 +239,33 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur	, std::vector<COutChunkHeader
 		
 		
 		fnc_dedisperse(parr_wfall, m_coh_dm_Vector[idm], m_tsamp * m_len_sft);
+
+		
+
+
+		
+		CFdmtCpu  fdmt(
+			m_Fmin
+			, m_Fmax
+			, m_nchan * m_len_sft// quant channels/rows of input image, including consisting of zeroes
+			, msamp
+			,  m_len_sft// quantity of rows of output image
+		);
+		fdmt.process_image(parr_wfall, parr_fdmt_res,false);
+		
+		if (idm == 60)
+		{
+			// -----------------------
+			//std::complex<float>* pcp = (std::complex<float> *)fbuf;
+			std::vector<float> vec(parr_fdmt_res, parr_fdmt_res + msamp * m_len_sft);
+			// Accessing elements
+			std::array<long unsigned, 2> leshape127{ m_len_sft  ,  msamp };
+
+			npy::SaveArrayAsNumpy("parr_wfall.npy", false, leshape127.size(), leshape127.data(), vec);
+			int ii = 0;
+		}
 		//---------------- 
-
-		//std::complex<float>* pcp = (std::complex<float> *)fbuf;
-		std::vector<float> vec(parr_wfall, parr_wfall + NEl);
-
-		// Accessing elements
-		std::array<long unsigned, 1> leshape127{ NEl };
-
-		npy::SaveArrayAsNumpy("pcmparrRawSignalCur_c.npy", false, leshape127.size(), leshape127.data(), vec);
-		int ii = 0;
+		
 		//--------------------
 		
 	}
@@ -251,6 +273,8 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur	, std::vector<COutChunkHeader
 	fftwf_free(parrElemWiseMulted);
 	fftwf_free(fbuf);
 	free(parr_wfall);
+	free(parr_fdmt_res);
+	free(parr_fdmt_norm);
 	return true;
 }
 //--------------------------------------------------------------
@@ -263,7 +287,7 @@ void CChunk_cpu::roll_(T* arr, const int lenarr, const int ishift)
 	}
 	T* arr0 = (T*)malloc(ishift * sizeof(T));
 	T* arr1 = (T*)malloc((lenarr - ishift) * sizeof(T));
-	memcpy(arr0, arr + lenarr - 1 - ishift, ishift * sizeof(T));
+	memcpy(arr0, arr + lenarr - ishift, ishift * sizeof(T));
 	memcpy(arr1, arr, (lenarr - ishift) * sizeof(T));
 	memcpy(arr, arr0, ishift * sizeof(T));
 	memcpy(arr + ishift, arr1, (lenarr - ishift) * sizeof(T));
@@ -272,7 +296,15 @@ void CChunk_cpu::roll_(T* arr, const int lenarr, const int ishift)
 }
 template void CChunk_cpu::roll_<int>(int* arr, const int lenarr, const int ishift);
 template void CChunk_cpu::roll_<float>(float* arr, const int lenarr, const int ishift);
-
+/* new_ar = waterfall.copy()
+    foff = (f_max - f_min) / nchans
+    chan_edge_freqs = np.arange(nchans) * foff + f_min
+    chan_edge_freqs = chan_edge_freqs[::-1]
+    delays = 4.148808e3 * dm * ((f_min**-2) - (chan_edge_freqs**-2))
+    shift = (delays / tsamp).round().astype("int32")
+    for ichan in range(waterfall.shape[0]):
+        new_ar[ichan] = np.roll(waterfall[ichan], shift[ichan])
+    return new_ar*/
 void CChunk_cpu::fnc_dedisperse(float* parr_wfall, const float dm, const float  tsamp)
 {
 	const int msamp = get_msamp();
@@ -283,10 +315,10 @@ void CChunk_cpu::fnc_dedisperse(float* parr_wfall, const float dm, const float  
 	//double *arr_chan_edge_freqs = (double*)malloc(nchans * sizeof(double));
 	for (int i = 0; i < nchans; ++i)
 	{
-		double temp  = (double )i * foff + f_min;
+		double temp  = (double )(nchans - 1 - i) * foff + f_min;
 		double temp1 = 4.148808e3 * dm * (1.0 / (f_min * f_min) - 1.0 / (temp * temp));
 		int ishift = round(temp1 / tsamp);
-		roll_(parr_wfall + (nchans - 1 - i) * msamp, msamp, ishift);
+		roll_(parr_wfall + i * msamp, msamp, ishift);
 	}
 
 	//free(arr_chan_edge_freqs);
