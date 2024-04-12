@@ -59,17 +59,14 @@ CFdmtB::CFdmtB(const  CFdmtB& R) :CFdmtB()
 	m_nchan = R.m_nchan;
 	m_cols = R.m_cols;
 	m_imaxDt = R.m_imaxDt;
-
 	m_iNumIter = R.m_iNumIter;
-
 	m_parrQuantMtrx = (int*)malloc((R.m_iNumIter + 1) * sizeof(int));
 	memcpy(m_parrQuantMtrx, R.m_parrQuantMtrx, (R.m_iNumIter + 1) * sizeof(int));
 
-
 	m_pparrFreq = (float**)malloc((R.m_iNumIter + 1) * sizeof(float*));
 	for (int i = 0; i < (R.m_iNumIter + 1); ++i) {
-		m_pparrFreq[i] = (float*)malloc(R.m_parrQuantMtrx[i] * sizeof(float));
-		memcpy(m_pparrFreq[i], R.m_pparrFreq[i], R.m_parrQuantMtrx[i] * sizeof(float));
+	m_pparrFreq[i] = (float*)malloc(R.m_parrQuantMtrx[i] * sizeof(float));
+	memcpy(m_pparrFreq[i], R.m_pparrFreq[i], R.m_parrQuantMtrx[i] * sizeof(float));
 	}
 
 	m_pparrRowsCumSum = (int**)malloc((R.m_iNumIter + 1) * sizeof(int*));
@@ -93,7 +90,6 @@ CFdmtB& CFdmtB::operator=(const CFdmtB& R)
 	m_imaxDt = R.m_imaxDt;
 	m_iNumIter = R.m_iNumIter;
 
-
 	for (int i = 0; i < m_iNumIter; ++i)
 	{
 		free(m_pparrFreq[i]);
@@ -101,12 +97,10 @@ CFdmtB& CFdmtB::operator=(const CFdmtB& R)
 	}
 	free(m_pparrFreq);
 	free(m_pparrRowsCumSum);
-
-
 	m_pparrFreq = (float**)malloc((R.m_iNumIter + 1) * sizeof(float*));
 	for (int i = 0; i < (R.m_iNumIter + 1); ++i) {
-		m_pparrFreq[i] = (float*)malloc(R.m_parrQuantMtrx[i] * sizeof(float));
-		memcpy(m_pparrFreq[i], R.m_pparrFreq[i], R.m_parrQuantMtrx[i] * sizeof(float));
+	m_pparrFreq[i] = (float*)malloc(R.m_parrQuantMtrx[i] * sizeof(float));
+	memcpy(m_pparrFreq[i], R.m_pparrFreq[i], R.m_parrQuantMtrx[i] * sizeof(float));
 	}
 
 	m_pparrRowsCumSum = (int**)malloc((R.m_iNumIter + 1) * sizeof(int*));
@@ -141,12 +135,9 @@ CFdmtB::CFdmtB(
 	create_config(m_pparrRowsCumSum, m_pparrFreq, &m_parrQuantMtrx, &m_iNumIter);
 }
 
-
-
 ////-------------------------------------------------------------------------
 void CFdmtB::process_image(fdmt_type_* piarrImgInp, fdmt_type_* piarrImgOut, const bool b_ones)
-{
-	
+{	
 }
 //------------------------------------------------------------------------------
 void  CFdmtB::create_config(int**& pparrRowsCumSum, float**& pparrFreq, int** pparrQuantMtrx, int* piNumIter)
@@ -169,12 +160,10 @@ void  CFdmtB::create_config(int**& pparrRowsCumSum, float**& pparrFreq, int** pp
 		pparrFreq[i] = (float*)malloc((iarrQuantMtrx[i] + 1) * sizeof(float));
 		pparrRowsCumSum[i] = (int*)malloc((iarrQuantMtrx[i] + 1) * sizeof(int));
 	}
-
 	// 2!
 
 	// 3. initialization 0 step	 
 	float* arrFreq = pparrFreq[0];
-	//int* iarrRowsCumSum = pparrRowsCumSum[0];
 
 	int* iarrQntSubmtrxRows = (int*)malloc(m_nchan * sizeof(int));
 
@@ -193,7 +182,6 @@ void  CFdmtB::create_config(int**& pparrRowsCumSum, float**& pparrFreq, int** pp
 	// 4. main loop. filling 2 config arrays	
 	for (int i = 1; i < *piNumIter + 1; ++i)
 	{
-
 		calcNextStateConfig(iarrQuantMtrx[i - 1], iarrQntSubmtrxRows, pparrFreq[i - 1]
 			, iarrQuantMtrx[i], iarrQntSubmtrxRowsCur, pparrFreq[i]);
 		memcpy(iarrQntSubmtrxRows, iarrQntSubmtrxRowsCur, iarrQuantMtrx[i] * sizeof(int));
@@ -240,7 +228,7 @@ int  CFdmtB::calc_quant_iterations()
 	{
 		if (quantMtrx == 1)
 		{
-			std::cout << "rows  = " << calc_deltaT(arrFreq[0], arrFreq[1]) + 1 << std::endl;
+			//std::cout << "rows  = " << calc_deltaT(arrFreq[0], arrFreq[1]) + 1 << std::endl;
 			break;
 		}
 		int isum = 0;
@@ -299,7 +287,7 @@ int  CFdmtB::calc_quant_iterations_and_lengthSubMtrxArray(int** pparrLength)
 	{
 		if (quantMtrx == 1)
 		{
-			std::cout << "rows  = " << calc_deltaT(arrFreq[0], arrFreq[1]) + 1 << std::endl;
+			//std::cout << "rows  = " << calc_deltaT(arrFreq[0], arrFreq[1]) + 1 << std::endl;
 			break;
 		}
 		int isum = 0;

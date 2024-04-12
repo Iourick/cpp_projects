@@ -254,7 +254,7 @@ int CLofarSession::launch()
         cudaDeviceSynchronize();
 
 
-        cudaStatus = cudaGetLastError();
+         cudaStatus = cudaGetLastError();
         if (cudaStatus != cudaSuccess) {
             fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
             // Handle the error appropriately

@@ -187,8 +187,7 @@ int CSessionB::launch()
         , m_header.m_centfreq - m_header.m_obsBW / 2.0
         , m_header.m_centfreq + m_header.m_obsBW / 2.0
         , m_header.m_npol
-        , m_header.m_nchan
-        , LenChunk
+        , m_header.m_nchan        
         , len_sft
         , 0
         , 0
@@ -204,17 +203,16 @@ int CSessionB::launch()
     
    
     FILE** prb_File = (FILE**)malloc( sizeof(FILE*));
-    if (!prb_File) {
-        // Handle memory allocation failure
+    if (!prb_File)
+    {       
         return 1;
     }    
     openFileReadingStream(prb_File);    
-    
-    for (int nB = 0; nB < IBlock; ++nB)        
-    {   
-        
-        std::cout << "                               BLOCK=  " << nB <<std::endl;      
+    std::vector<float>* pvecImg = new std::vector<float>;
 
+    for (int nB = 0; nB < IBlock; ++nB)        
+    {          
+        std::cout << "                               BLOCK=  " << nB <<std::endl;  
         createCurrentTelescopeHeader(prb_File);        
        
         const int NumChunks = (m_header.m_nblocksize - 2 *QUantOverlapBytes - 1) / (QUantChunkBytes - 2 *QUantOverlapBytes) + 1;
@@ -237,7 +235,7 @@ int CSessionB::launch()
             unpack_chunk(LenChunk, Noverlap,  (inp_type_*)parrInput,  pcmparrRawSignalCur);
            (*ppChunk)->set_blockid(nB);
            (*ppChunk)->set_chunkid(j);
-           (*ppChunk)->process(pcmparrRawSignalCur, m_pvctSuccessHeaders);
+           (*ppChunk)->process(pcmparrRawSignalCur, m_pvctSuccessHeaders, pvecImg);
           
         }
         
@@ -264,6 +262,7 @@ int CSessionB::launch()
    freeInputMemory(parrInput, pcmparrRawSignalCur);
     
     delete (*ppChunk);
+    delete pvecImg;
     ppChunk = nullptr;    
     return 0;
 }
@@ -289,8 +288,7 @@ void CSessionB::createChunk(CChunkB** ppchunk
     , const float Fmin
     , const float Fmax
     , const int npol
-    , const int nchan
-    , const unsigned int lenChunk
+    , const int nchan   
     , const unsigned int len_sft
     , const int Block_id
     , const int Chunk_id

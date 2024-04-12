@@ -101,12 +101,10 @@
 		const float Fmin
 		, const float Fmax
 		, const int npol
-		, const int nchan
-		, const unsigned int lenChunk
+		, const int nchan		
 		, const unsigned int len_sft
 		, const int Block_id
 		, const int Chunk_id
-
 		, const double d_max
 		, const double d_min
 		, const int ncoherent
@@ -118,8 +116,7 @@
 		, const float tsamp) : CChunkB(Fmin
 			, Fmax
 			, npol
-			, nchan
-			, lenChunk
+			, nchan			
 			, len_sft
 			, Block_id
 			, Chunk_id
@@ -138,8 +135,8 @@
 	//
 	//
 	////---------------------------------------------------
-	bool CChunk_gpu::process(void* pcmparrRawSignalCur
-		, std::vector<COutChunkHeader>* pvctSuccessHeaders)
+	bool CChunk_gpu:: process(void* pcmparrRawSignalCur
+		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<float>* vecImg)
 	{
 
 		return true;
@@ -201,16 +198,16 @@ bool CChunk_gpu::detailedChunkProcessing(
 
 	
 
-	//std::vector<std::complex<float>> data0(m_lenChunk * m_nchan * m_npol / 2, 0);
-	//cudaMemcpy(data0.data(), pcarrCD_Out, m_lenChunk * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
+	//std::vector<std::complex<float>> data0(m_nbin * m_nchan * m_npol / 2, 0);
+	//cudaMemcpy(data0.data(), pcarrCD_Out, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
 	//	cudaMemcpyDeviceToHost);
 	//cudaDeviceSynchronize();
 
 	cufftResult result = cufftExecC2C(plan1, pcarrCD_Out, pcarrTemp, CUFFT_FORWARD);
 	cudaDeviceSynchronize();
 
-	/*std::vector<std::complex<float>> data(m_lenChunk * m_nchan * m_npol / 2, 0);
-	cudaMemcpy(data.data(), pcarrTemp, m_lenChunk * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
+	/*std::vector<std::complex<float>> data(m_nbin * m_nchan * m_npol / 2, 0);
+	cudaMemcpy(data.data(), pcarrTemp, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
 		cudaMemcpyDeviceToHost);
 	cudaDeviceSynchronize();*/
 
@@ -221,10 +218,10 @@ bool CChunk_gpu::detailedChunkProcessing(
 
 	calc_fdmt_inp(d_parr_fdmt_inp, pcarrTemp, (float*)pcarrCD_Out);
 	//
-	/*std::vector<float> data(m_lenChunk * m_nchan * m_npol / 2, 0);
-	cudaMemcpy(data.data(), d_parr_fdmt_inp, m_lenChunk * m_nchan * m_npol / 2 * sizeof(float),
+	/*std::vector<float> data(m_nbin * m_nchan * m_npol / 2, 0);
+	cudaMemcpy(data.data(), d_parr_fdmt_inp, m_nbin * m_nchan * m_npol / 2 * sizeof(float),
 		cudaMemcpyDeviceToHost);
-	std::array<long unsigned, 2> leshape129{ m_len_sft * m_nchan, m_lenChunk / m_len_sft };
+	std::array<long unsigned, 2> leshape129{ m_len_sft * m_nchan, m_nbin / m_len_sft };
 	npy::SaveArrayAsNumpy("fdmt_inp.npy", false, leshape129.size(), leshape129.data(), data);*/
 
 
@@ -236,13 +233,13 @@ bool CChunk_gpu::detailedChunkProcessing(
 
 	m_Fdmt.process_image(d_parr_fdmt_inp	, d_parr_fdmt_out, false);
 
-	float* d_fdmt_normalized = (float*)malloc(m_lenChunk * m_nchan * sizeof(float));
-	cudaMallocManaged((void**)&d_fdmt_normalized, m_lenChunk * m_nchan * sizeof(float));
+	float* d_fdmt_normalized = (float*)malloc(m_nbin * m_nchan * sizeof(float));
+	cudaMallocManaged((void**)&d_fdmt_normalized, m_nbin * m_nchan * sizeof(float));
 	const int Rows = m_Fdmt.m_imaxDt;
 	const int Cols = m_Fdmt.m_cols;
 	int theads = 1024;
-	int blocks = (m_lenChunk + theads - 1) / theads;
-	fdmt_normalization << < blocks, theads >> > (d_parr_fdmt_out, d_arrfdmt_norm, m_lenChunk * m_nchan, d_fdmt_normalized);
+	int blocks = (m_nbin + theads - 1) / theads;
+	fdmt_normalization << < blocks, theads >> > (d_parr_fdmt_out, d_arrfdmt_norm, m_nbin * m_nchan, d_fdmt_normalized);
 	cudaDeviceSynchronize();
 
 	float* h_parrImage = (float*)malloc(Rows * Cols * sizeof(float));
@@ -283,8 +280,8 @@ bool CChunk_gpu::fncChunkProcessing_gpu(cufftComplex* pcmparrRawSignalCur
 	fdmt_type_* d_parr_fdmt_out =  (fdmt_type_ *)pInpOutBuffFdmt + m_Fdmt.m_nchan * m_Fdmt.m_cols;
 	//// !1
 
-	/* std::vector<std::complex<float>> data2(m_lenChunk, 0);
-	cudaMemcpy(data2.data(), pcmparrRawSignalCur, m_lenChunk * sizeof(std::complex<float>),
+	/* std::vector<std::complex<float>> data2(m_nbin, 0);
+	cudaMemcpy(data2.data(), pcmparrRawSignalCur, m_nbin * sizeof(std::complex<float>),
 		cudaMemcpyDeviceToHost);
 	cudaDeviceSynchronize();*/
 	//std::array<long unsigned, 1> leshape127{ LEnChunk };
@@ -308,8 +305,8 @@ bool CChunk_gpu::fncChunkProcessing_gpu(cufftComplex* pcmparrRawSignalCur
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 	iFFT_time += duration.count();
 
-	/*std::vector<std::complex<float>> data(m_lenChunk * m_nchan * m_npol/2, 0);
-	cudaMemcpy(data.data(), pcmparrRawSignalCur, m_lenChunk * m_nchan * m_npol/2 * sizeof(std::complex<float>),
+	/*std::vector<std::complex<float>> data(m_nbin * m_nchan * m_npol/2, 0);
+	cudaMemcpy(data.data(), pcmparrRawSignalCur, m_nbin * m_nchan * m_npol/2 * sizeof(std::complex<float>),
 		cudaMemcpyDeviceToHost);
 	cudaDeviceSynchronize();*/
 
@@ -359,8 +356,8 @@ bool CChunk_gpu::fncChunkProcessing_gpu(cufftComplex* pcmparrRawSignalCur
 		double valcur_coherent_d = ((double)iouter_d) * ((double)m_d_max / ((double)m_ncoherent));
 		cout << "Chunk=  " << m_Chunk_id <<  "; iter= " << iouter_d << "; coherent_d = " << valcur_coherent_d << endl;
 
-		/*std::vector<std::complex<float>> data(m_lenChunk * m_nchan * m_npol /2, 0);
-		cudaMemcpy(data.data(), pcmparrRawSignalCur, m_lenChunk * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
+		/*std::vector<std::complex<float>> data(m_nbin * m_nchan * m_npol /2, 0);
+		cudaMemcpy(data.data(), pcmparrRawSignalCur, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
 		cudaMemcpyDeviceToHost);
 		cudaDeviceSynchronize();*/
 		
@@ -370,17 +367,17 @@ bool CChunk_gpu::fncChunkProcessing_gpu(cufftComplex* pcmparrRawSignalCur
 			, DISPERSION_CONSTANT * valcur_coherent_d
 			, pAuxBuff_fdmt, plan0, plan1, pcarrBuff);*/
 		// !
-		///*float* parr_fdmt_out = (float*)malloc(m_lenChunk * m_nchan* sizeof(float));
-		//cudaMemcpy(parr_fdmt_out, d_parr_fdmt_out, m_lenChunk * m_nchan * sizeof(float), cudaMemcpyDeviceToHost);
+		///*float* parr_fdmt_out = (float*)malloc(m_nbin * m_nchan* sizeof(float));
+		//cudaMemcpy(parr_fdmt_out, d_parr_fdmt_out, m_nbin * m_nchan * sizeof(float), cudaMemcpyDeviceToHost);
 		//float valmax = -0., valmin = 0.;
 		//unsigned int iargmax = -1, iargmin = -1;
-		//findMaxMinOfArray(parr_fdmt_out, m_lenChunk * m_nchan, &valmax, &valmin
+		//findMaxMinOfArray(parr_fdmt_out, m_nbin * m_nchan, &valmax, &valmin
 		//	, &iargmax, &iargmin);
-		//float* arrfdmt_norm = (float*)malloc(m_lenChunk * m_nchan * sizeof(float));
-		//cudaMemcpy(arrfdmt_norm, d_arrfdmt_norm, m_lenChunk * m_nchan * sizeof(float), cudaMemcpyDeviceToHost);
+		//float* arrfdmt_norm = (float*)malloc(m_nbin * m_nchan * sizeof(float));
+		//cudaMemcpy(arrfdmt_norm, d_arrfdmt_norm, m_nbin * m_nchan * sizeof(float), cudaMemcpyDeviceToHost);
 		//float valmax1 = -0., valmin1 = 0.;
 		//unsigned int iargmax1 = -1, iargmin1 = -1;
-		//findMaxMinOfArray(arrfdmt_norm, m_lenChunk * m_nchan, &valmax1, &valmin1
+		//findMaxMinOfArray(arrfdmt_norm, m_nbin * m_nchan, &valmax1, &valmin1
 		//	, &iargmax1, &iargmin1);
 		//free(parr_fdmt_out);
 		//free(arrfdmt_norm);*/
@@ -396,16 +393,16 @@ bool CChunk_gpu::fncChunkProcessing_gpu(cufftComplex* pcmparrRawSignalCur
 
 		auto start = std::chrono::high_resolution_clock::now();
 
-		/*std::vector<std::complex<float>> data0(m_lenChunk * m_nchan * m_npol / 2, 0);
-		cudaMemcpy(data0.data(), pcarrCD_Out, m_lenChunk * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
+		/*std::vector<std::complex<float>> data0(m_nbin * m_nchan * m_npol / 2, 0);
+		cudaMemcpy(data0.data(), pcarrCD_Out, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
 			cudaMemcpyDeviceToHost);
 		cudaDeviceSynchronize();*/
 
 		cufftResult result = cufftExecC2C(plan1, pcarrCD_Out, pcarrTemp, CUFFT_FORWARD);
 		cudaDeviceSynchronize();
 
-		/*std::vector<std::complex<float>> data(m_lenChunk * m_nchan * m_npol / 2, 0);
-		cudaMemcpy(data.data(), pcarrTemp, m_lenChunk * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
+		/*std::vector<std::complex<float>> data(m_nbin * m_nchan * m_npol / 2, 0);
+		cudaMemcpy(data.data(), pcarrTemp, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
 			cudaMemcpyDeviceToHost);
 		cudaDeviceSynchronize();*/
 
@@ -416,11 +413,11 @@ bool CChunk_gpu::fncChunkProcessing_gpu(cufftComplex* pcmparrRawSignalCur
 		
 		calc_fdmt_inp(d_parr_fdmt_inp, pcarrTemp, (float*)pcarrCD_Out);
 		//
-		/*std::vector<float> data4(m_lenChunk * m_nchan * m_npol / 2, 0);
-		cudaMemcpy(data4.data(), d_parr_fdmt_inp, m_lenChunk * m_nchan * m_npol / 2 * sizeof(float),
+		/*std::vector<float> data4(m_nbin * m_nchan * m_npol / 2, 0);
+		cudaMemcpy(data4.data(), d_parr_fdmt_inp, m_nbin * m_nchan * m_npol / 2 * sizeof(float),
 			cudaMemcpyDeviceToHost);
 		cudaDeviceSynchronize();*/
-		/*std::array<long unsigned, 2> leshape129{ m_len_sft * m_nchan, m_lenChunk / m_len_sft };
+		/*std::array<long unsigned, 2> leshape129{ m_len_sft * m_nchan, m_nbin / m_len_sft };
 		npy::SaveArrayAsNumpy("fdmt_inp.npy", false, leshape129.size(), leshape129.data(), data);*/
 
 		cudaStatus = cudaGetLastError();
@@ -558,11 +555,11 @@ long long CChunk_gpu::calcLenChunk_(CTelescopeHeader header, const int nsft
 //{
 //	// 1. installation of pointers	for pAuxBuff_the_rest
 //	fdmt_type_* d_parr_fdmt_inp = (fdmt_type_*)pInpOutBuffFdmt; //4	
-//	fdmt_type_* d_parr_fdmt_out = (fdmt_type_*)pInpOutBuffFdmt + m_lenChunk * m_nchan;
+//	fdmt_type_* d_parr_fdmt_out = (fdmt_type_*)pInpOutBuffFdmt + m_nbin * m_nchan;
 //	//// !1
 //
-//	 /*std::vector<std::complex<float>> data2(m_lenChunk, 0);
-//	cudaMemcpy(data2.data(), pcmparrRawSignalCur, m_lenChunk * sizeof(std::complex<float>),
+//	 /*std::vector<std::complex<float>> data2(m_nbin, 0);
+//	cudaMemcpy(data2.data(), pcmparrRawSignalCur, m_nbin * sizeof(std::complex<float>),
 //		cudaMemcpyDeviceToHost);
 //	cudaDeviceSynchronize();*/
 //	//std::array<long unsigned, 1> leshape127{ LEnChunk };
@@ -572,7 +569,7 @@ long long CChunk_gpu::calcLenChunk_(CTelescopeHeader header, const int nsft
 //
 //	// 2. create FFT	
 //	//cufftComplex* pcmparr_ffted = NULL;
-//	//checkCudaErrors(cudaMallocManaged((void**)&pcmparr_ffted, m_lenChunk * m_nchan * m_npol/2 * sizeof(cufftComplex)));
+//	//checkCudaErrors(cudaMallocManaged((void**)&pcmparr_ffted, m_nbin * m_nchan * m_npol/2 * sizeof(cufftComplex)));
 //	//checkCudaErrors(cufftExecC2C(plan0, pcmparrRawSignalCur, pcmparr_ffted, CUFFT_FORWARD));
 //	checkCudaErrors(cufftExecC2C(plan0, pcmparrRawSignalCur, pcmparrRawSignalCur, CUFFT_FORWARD));
 //
@@ -582,8 +579,8 @@ long long CChunk_gpu::calcLenChunk_(CTelescopeHeader header, const int nsft
 //	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 //	iFFT_time += duration.count();
 //
-//	/*std::vector<std::complex<float>> data(m_lenChunk * m_nchan * m_npol/2, 0);
-//	cudaMemcpy(data.data(), pcmparrRawSignalCur, m_lenChunk * m_nchan * m_npol/2 * sizeof(std::complex<float>),
+//	/*std::vector<std::complex<float>> data(m_nbin * m_nchan * m_npol/2, 0);
+//	cudaMemcpy(data.data(), pcmparrRawSignalCur, m_nbin * m_nchan * m_npol/2 * sizeof(std::complex<float>),
 //		cudaMemcpyDeviceToHost);
 //	cudaDeviceSynchronize();*/
 //
@@ -618,8 +615,8 @@ long long CChunk_gpu::calcLenChunk_(CTelescopeHeader header, const int nsft
 //		double valcur_coherent_d = ((double)iouter_d) * ((double)m_d_max / ((double)n_coherent));
 //		cout << "Chunk=  " << m_Chunk_id << "; chunk= " << iouter_d << "; iter= " << iouter_d << "; coherent_d = " << valcur_coherent_d << endl;
 //
-//		/*std::vector<std::complex<float>> data(m_lenChunk * m_nchan * m_npol /2, 0);
-//		cudaMemcpy(data.data(), pcmparrRawSignalCur, m_lenChunk * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
+//		/*std::vector<std::complex<float>> data(m_nbin * m_nchan * m_npol /2, 0);
+//		cudaMemcpy(data.data(), pcmparrRawSignalCur, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
 //		cudaMemcpyDeviceToHost);
 //		cudaDeviceSynchronize();*/
 //
@@ -629,24 +626,24 @@ long long CChunk_gpu::calcLenChunk_(CTelescopeHeader header, const int nsft
 //			, IMaxDT, DISPERSION_CONSTANT * valcur_coherent_d
 //			, pAuxBuff_fdmt, IDeltaT, plan0, plan1, pcarrBuff);
 //		// !
-//		///*float* parr_fdmt_out = (float*)malloc(m_lenChunk * m_nchan* sizeof(float));
-//		//cudaMemcpy(parr_fdmt_out, d_parr_fdmt_out, m_lenChunk * m_nchan * sizeof(float), cudaMemcpyDeviceToHost);
+//		///*float* parr_fdmt_out = (float*)malloc(m_nbin * m_nchan* sizeof(float));
+//		//cudaMemcpy(parr_fdmt_out, d_parr_fdmt_out, m_nbin * m_nchan * sizeof(float), cudaMemcpyDeviceToHost);
 //		//float valmax = -0., valmin = 0.;
 //		//unsigned int iargmax = -1, iargmin = -1;
-//		//findMaxMinOfArray(parr_fdmt_out, m_lenChunk * m_nchan, &valmax, &valmin
+//		//findMaxMinOfArray(parr_fdmt_out, m_nbin * m_nchan, &valmax, &valmin
 //		//	, &iargmax, &iargmin);
-//		//float* arrfdmt_norm = (float*)malloc(m_lenChunk * m_nchan * sizeof(float));
-//		//cudaMemcpy(arrfdmt_norm, d_arrfdmt_norm, m_lenChunk * m_nchan * sizeof(float), cudaMemcpyDeviceToHost);
+//		//float* arrfdmt_norm = (float*)malloc(m_nbin * m_nchan * sizeof(float));
+//		//cudaMemcpy(arrfdmt_norm, d_arrfdmt_norm, m_nbin * m_nchan * sizeof(float), cudaMemcpyDeviceToHost);
 //		//float valmax1 = -0., valmin1 = 0.;
 //		//unsigned int iargmax1 = -1, iargmin1 = -1;
-//		//findMaxMinOfArray(arrfdmt_norm, m_lenChunk * m_nchan, &valmax1, &valmin1
+//		//findMaxMinOfArray(arrfdmt_norm, m_nbin * m_nchan, &valmax1, &valmin1
 //		//	, &iargmax1, &iargmin1);
 //		//free(parr_fdmt_out);
 //		//free(arrfdmt_norm);*/
 //
 //		//
 //		const int Rows = m_len_sft * m_nchan;
-//		const int Cols = m_lenChunk / m_len_sft;
+//		const int Cols = m_nbin / m_len_sft;
 //		const dim3 Totalsize(1024, 1, 1);
 //		const dim3 gridSize((Cols + Totalsize.x - 1) / Totalsize.x, Rows, 1);
 //		float* d_pAuxArray = (float*)d_parr_fdmt_inp;
@@ -692,12 +689,12 @@ long long CChunk_gpu::calcLenChunk_(CTelescopeHeader header, const int nsft
 
 //--------------------------------------------------------------------
 //INPUT:
-//1. pcarrTemp - complex array with total length  = m_lenChunk * (m_npol/2)* m_nchan
+//1. pcarrTemp - complex array with total length  = m_nbin * (m_npol/2)* m_nchan
 // pcarrTemp can be interpreted as matrix, consisting of  m_nchan *(m_npol/2) rows
 // each row consists of m_len_sft subrows corresponding to m_len_sft subfrequencies
 // 2.pAuxBuff - auxillary buffer to compute mean and dispersions of each row ofoutput matrix d_parr_fdmt_inp
 //OUTPUT:
-//d_parr_fdmt_inp - matrix with dimensions (m_nchan*m_len_sft) x (m_lenChunk/m_len_sft)
+//d_parr_fdmt_inp - matrix with dimensions (m_nchan*m_len_sft) x (m_nbin/m_len_sft)
 // d_parr_fdmt_inp[i][j] = 
 //
 void CChunk_gpu::calc_fdmt_inp(fdmt_type_* d_parr_fdmt_inp, cufftComplex* pcarrTemp
@@ -705,15 +702,15 @@ void CChunk_gpu::calc_fdmt_inp(fdmt_type_* d_parr_fdmt_inp, cufftComplex* pcarrT
 {	
 	
 	/*dim3 threadsPerChunk(TILE_DIM, TILE_DIM, 1);
-	dim3 ChunksPerGrid((m_len_sft + TILE_DIM - 1) / TILE_DIM, (m_lenChunk / m_len_sft + TILE_DIM - 1) / TILE_DIM, m_nchan);
+	dim3 ChunksPerGrid((m_len_sft + TILE_DIM - 1) / TILE_DIM, (m_nbin / m_len_sft + TILE_DIM - 1) / TILE_DIM, m_nchan);
 	size_t sz = TILE_DIM * (TILE_DIM + 1) * sizeof(float);
 	float* d_parr_fdmt_inp_flt = pAuxBuff;	
-	calcPowerMtrx_kernel << < ChunksPerGrid, threadsPerChunk, sz >> > (d_parr_fdmt_inp_flt, m_lenChunk/ m_len_sft, m_len_sft, m_npol, pcarrTemp);
+	calcPowerMtrx_kernel << < ChunksPerGrid, threadsPerChunk, sz >> > (d_parr_fdmt_inp_flt, m_nbin/ m_len_sft, m_len_sft, m_npol, pcarrTemp);
 	cudaDeviceSynchronize();*/
 
 
-	//std::vector<float> data0(m_lenChunk, 0);
-	//cudaMemcpy(data0.data(), d_parr_fdmt_inp_flt, m_lenChunk * sizeof(float),
+	//std::vector<float> data0(m_nbin, 0);
+	//cudaMemcpy(data0.data(), d_parr_fdmt_inp_flt, m_nbin * sizeof(float),
 	//	cudaMemcpyDeviceToHost);
 	//cudaDeviceSynchronize();
 	//float valmax = 0., valmin = 0.;
@@ -722,26 +719,26 @@ void CChunk_gpu::calc_fdmt_inp(fdmt_type_* d_parr_fdmt_inp, cufftComplex* pcarrT
 	//	, &iargmax, &iargmin);
 	float* d_parr_fdmt_temp = pAuxBuff;
 	dim3 threadsPerChunk(1024, 1, 1);
-	dim3 ChunksPerGrid((m_lenChunk * threadsPerChunk.x - 1) / threadsPerChunk.x, m_nchan, 1);
-	calcPartSum_kernel<<< ChunksPerGrid, threadsPerChunk>>>(d_parr_fdmt_temp, m_lenChunk, m_npol/2, pcarrTemp);
+	dim3 ChunksPerGrid((m_nbin * threadsPerChunk.x - 1) / threadsPerChunk.x, m_nchan, 1);
+	calcPartSum_kernel<<< ChunksPerGrid, threadsPerChunk>>>(d_parr_fdmt_temp, m_nbin, m_npol/2, pcarrTemp);
 	cudaDeviceSynchronize();
 
-	/*std::vector<float> data0(m_lenChunk, 0);
-	cudaMemcpy(data0.data(), d_parr_fdmt_temp, m_lenChunk * sizeof(float),
+	/*std::vector<float> data0(m_nbin, 0);
+	cudaMemcpy(data0.data(), d_parr_fdmt_temp, m_nbin * sizeof(float),
 		cudaMemcpyDeviceToHost);*/
 
-	float* d_parr_fdmt_inp_flt = d_parr_fdmt_temp + m_lenChunk * m_nchan;
+	float* d_parr_fdmt_inp_flt = d_parr_fdmt_temp + m_nbin * m_nchan;
 	dim3 threadsPerBlock1(TILE_DIM, TILE_DIM, 1);
-	dim3 blocksPerGrid1((m_len_sft + TILE_DIM - 1) / TILE_DIM, (m_lenChunk / m_len_sft + TILE_DIM - 1) / TILE_DIM, m_nchan);
+	dim3 blocksPerGrid1((m_len_sft + TILE_DIM - 1) / TILE_DIM, (m_nbin / m_len_sft + TILE_DIM - 1) / TILE_DIM, m_nchan);
 	size_t sz = TILE_DIM * (TILE_DIM + 1) * sizeof(float);
-	multiTransp_kernel << < blocksPerGrid1, threadsPerBlock1, sz >> > (d_parr_fdmt_inp_flt, m_lenChunk / m_len_sft, m_len_sft, d_parr_fdmt_temp);
+	multiTransp_kernel << < blocksPerGrid1, threadsPerBlock1, sz >> > (d_parr_fdmt_inp_flt, m_nbin / m_len_sft, m_len_sft, d_parr_fdmt_temp);
 	cudaDeviceSynchronize();
 
-	/*std::vector<float> data6(m_lenChunk, 0);
-	cudaMemcpy(data6.data(), d_parr_fdmt_inp_flt, m_lenChunk * sizeof(float),
+	/*std::vector<float> data6(m_nbin, 0);
+	cudaMemcpy(data6.data(), d_parr_fdmt_inp_flt, m_nbin * sizeof(float),
 		cudaMemcpyDeviceToHost);*/
 	int nFdmtRows = m_nchan * m_len_sft;
-	int nFdmtCols = m_lenChunk / m_len_sft;
+	int nFdmtCols = m_nbin / m_len_sft;
 	float* d_arrRowMean = (float*)pcarrTemp;
 	float* d_arrRowDisp = d_arrRowMean + nFdmtRows;
 	
@@ -906,15 +903,15 @@ void CChunk_gpu::fncCD_Multiband_gpu(cufftComplex* pcarrCD_Out, cufftComplex* pc
 	, const  double VAl_practicalD, cufftHandle  plan, cufftComplex* pAuxBuff)
 {	
 	 const dim3 Totalsize = dim3(1024, 1, 1);
-	 const dim3 gridSize = dim3((m_lenChunk + Totalsize.x - 1) / Totalsize.x,  m_nchan,1);	
+	 const dim3 gridSize = dim3((m_nbin + Totalsize.x - 1) / Totalsize.x,  m_nchan,1);	
 	 kernel_ElementWiseMult << < gridSize, Totalsize >> >
-		 (pAuxBuff,pcarrffted_rowsignal, m_lenChunk, m_npol/2, VAl_practicalD, m_Fmin
+		 (pAuxBuff,pcarrffted_rowsignal, m_nbin, m_npol/2, VAl_practicalD, m_Fmin
 		 	, m_Fmax);
 	 
 	 cudaDeviceSynchronize();
 
-	/*std::vector<std::complex<float>> data(m_lenChunk * m_nchan * m_npol / 2, 0);
-	cudaMemcpy(data.data(), pAuxBuff, m_lenChunk * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
+	/*std::vector<std::complex<float>> data(m_nbin * m_nchan * m_npol / 2, 0);
+	cudaMemcpy(data.data(), pAuxBuff, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
 		cudaMemcpyDeviceToHost);
 	cudaDeviceSynchronize();*/
 
@@ -925,12 +922,12 @@ void CChunk_gpu::fncCD_Multiband_gpu(cufftComplex* pcarrCD_Out, cufftComplex* pc
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 	iFFT_time += duration.count();
 
-	/*std::vector<std::complex<float>> data1(m_lenChunk * m_nchan * m_npol / 2, 0);
-	cudaMemcpy(data1.data(), pcarrCD_Out, m_lenChunk * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
+	/*std::vector<std::complex<float>> data1(m_nbin * m_nchan * m_npol / 2, 0);
+	cudaMemcpy(data1.data(), pcarrCD_Out, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
 		cudaMemcpyDeviceToHost);
 	cudaDeviceSynchronize();*/
 	
-	scaling_kernel << <1, 1024, 0 >> > (pcarrCD_Out, m_lenChunk * m_npol* m_nchan/2, 1.f / ((float)m_lenChunk));
+	scaling_kernel << <1, 1024, 0 >> > (pcarrCD_Out, m_nbin * m_npol* m_nchan/2, 1.f / ((float)m_nbin));
 	cudaDeviceSynchronize();
 }
 

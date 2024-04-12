@@ -2,17 +2,9 @@
 //#include "stdio.h"
 #include <vector>
 #include <math.h>
-//
 #include "Constants.h"
-//
-//
-//using namespace std;
-//
-class COutChunkHeader;
-//class CFragment;
-//
-//class CTelescopeHeader;
 
+class COutChunkHeader;
 class CChunkB
 {
 public:
@@ -25,11 +17,10 @@ public:
 		, const float Fmax
 		, const int npol
 		, const int nchan
-		, const unsigned int lenChunk
+		//, const unsigned int lenChunk
 		, const unsigned int len_sft
 		, const int Block_id
 		, const int Chunk_id
-
 		, const double d_max
 		, const double d_min
 		, const int ncoherent
@@ -55,7 +46,7 @@ public:
 
 	// length of time series of each channel
 	
-	unsigned m_lenChunk;
+	//unsigned m_lenChunk;
 
 	unsigned int m_len_sft;
 
@@ -64,8 +55,6 @@ public:
 	int m_Chunk_id;
 
 	int m_Block_id;
-
-	//int m_nbits;	
 
 	double m_d_max;
 
@@ -76,17 +65,12 @@ public:
 	float m_sigma_bound;
 
 	int m_length_sum_wnd;
-
-	//CFdmtC m_Fdmt;
-
 	int m_nbin;
-
 	int m_nfft;
-
 	int m_noverlap;
 	//-------------------------------------------------------------------------
 	virtual bool process(void* pcmparrRawSignalCur
-		, std::vector<COutChunkHeader>* pvctSuccessHeaders);
+		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<float>* vecImg);
 
 
 

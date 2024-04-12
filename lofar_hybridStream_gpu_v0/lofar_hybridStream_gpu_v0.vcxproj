@@ -42,11 +42,11 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Program Files\HDF_Group\HDF5\1.14.3\include;D:\VS_PROJECTS\MyVSLib_C++\CheckCudaErr;..\MyVSLib_C++;..\Dependencies\freeglut\include;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Program Files\HDF_Group\HDF5\1.14.3\include;D:\cpp_projects\MyVSLib_C++\CheckCudaErr;..\MyVSLib_C++;..\Dependencies\freeglut\include;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Program Files\HDF_Group\HDF5\1.14.3\lib;..\Dependencies\freeglut\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>C:\Program Files\HDF_Group\HDF5\1.14.3\include;D:\VS_PROJECTS\MyVSLib_C++\CheckCudaErr;..\MyVSLib_C++;..\Dependencies\freeglut\include;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Program Files\HDF_Group\HDF5\1.14.3\include;D:\cpp_projects\MyVSLib_C++\CheckCudaErr;..\MyVSLib_C++;..\Dependencies\freeglut\include;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Program Files\HDF_Group\HDF5\1.14.3\lib;..\Dependencies\freeglut\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

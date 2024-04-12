@@ -463,8 +463,7 @@ void CSession_guppi::createChunk(CChunkB** ppchunk
     , const float Fmin
     , const float Fmax
     , const int npol
-    , const int nchan
-    , const unsigned int lenChunk
+    , const int nchan   
     , const unsigned int len_sft
     , const int Block_id
     , const int Chunk_id

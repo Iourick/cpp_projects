@@ -1,21 +1,12 @@
 #pragma once
-//#include "stdio.h"
-#include <vector>
-#include <math.h>
-//
-#include "Constants.h"
+
 #include "ChunkB.h"
-//
-//
-//using namespace std;
-//
 class COutChunkHeader;
 class CChunkB;
 #include <fftw3.h>
 #include <complex> 
 #define STR_WIS_LEN 10000
 //class CFragment;
-//
 //class CTelescopeHeader;
 
 class CChunk_cpu:public CChunkB
@@ -29,8 +20,7 @@ public:
 		const float Fmin
 		, const float Fmax
 		, const int npol
-		, const int nchan
-		, const unsigned int lenChunk
+		, const int nchan		
 		, const unsigned int len_sft
 		, const int Block_id
 		, const int Chunk_id
@@ -55,7 +45,7 @@ public:
 	
 	//-------------------------------------------------------------------------
 	virtual bool process(void* pcmparrRawSignalCur
-		, std::vector<COutChunkHeader>* pvctSuccessHeaders);
+		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<float>* vecImg);
 
 	void compute_chirp_channel(std::vector<std::complex<float>>* parr_dc, const  std::vector<float>* parr_coh_dm);
 
@@ -91,6 +81,10 @@ public:
 	{
 		return m_nfft * get_mbin_adjusted();
 	}
+
+	//bool detect_signal(fdmt_type_* arr, fdmt_type_* norm, const int Rows, const int  Cols, structOutDetection* pstrOut);
+
+	//void detect_signal_in_row(fdmt_type_* arr, fdmt_type_* norm, const int  Cols, const int  NumRow, structOutDetection* pstrOut);
 };
 
 

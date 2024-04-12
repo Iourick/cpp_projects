@@ -1,26 +1,7 @@
 #include "ChunkB.h"
-//
-//#include <vector>
-//#include "OutChunkHeader.h"
-//
-//#include "Constants.h"
-//
-//
-//
 #include <chrono>
-//
-//
-//
-//
 #include <complex>
-//
-////#include "Fragment.h"
-#include "npy.hpp"
-//#include "TelescopeHeader.h"
-
-
-
-
+//#include "npy.hpp"
 
 #ifdef _WIN32 // Windows
 
@@ -79,8 +60,7 @@ CChunkB::CChunkB()
 	m_Fmax = 0;
 	m_npol = 0;
 
-	m_nchan = 0;
-	m_lenChunk = 0;
+	m_nchan = 0;	
 	m_len_sft = 0;
 	m_Block_id = 0;
 	m_Chunk_id = -1;
@@ -103,8 +83,7 @@ CChunkB::CChunkB(const  CChunkB& R)
 	m_Fmin = R.m_Fmin;
 	m_Fmax = R.m_Fmax;
 	m_npol = R.m_npol;
-	m_nchan = R.m_nchan;
-	m_lenChunk = R.m_lenChunk;
+	m_nchan = R.m_nchan;	
 	m_len_sft = R.m_len_sft;
 	m_Chunk_id = R.m_Chunk_id;
 	m_Block_id = R.m_Block_id;
@@ -129,8 +108,7 @@ CChunkB& CChunkB::operator=(const CChunkB& R)
 	m_Fmin = R.m_Fmin;
 	m_Fmax = R.m_Fmax;
 	m_npol = R.m_npol;
-	m_nchan = R.m_nchan;
-	m_lenChunk = R.m_lenChunk;
+	m_nchan = R.m_nchan;	
 	m_len_sft = R.m_len_sft;
 	m_Chunk_id = R.m_Chunk_id;
 	m_Block_id = R.m_Block_id;
@@ -150,12 +128,10 @@ CChunkB::CChunkB(
 	const float Fmin
 	, const float Fmax
 	, const int npol
-	, const int nchan
-	, const unsigned int lenChunk
+	, const int nchan	
 	, const unsigned int len_sft
 	, const int Block_id
 	, const int Chunk_id
-
 	, const double d_max
 	, const double d_min
 	, const int ncoherent
@@ -171,8 +147,7 @@ CChunkB::CChunkB(
 	m_Fmax = Fmax;
 	m_npol = npol;
 
-	m_nchan = nchan;
-	m_lenChunk = lenChunk;
+	m_nchan = nchan;	
 	m_len_sft = len_sft;
 	m_Block_id = Block_id;
 	m_Chunk_id = Chunk_id;
@@ -193,7 +168,7 @@ CChunkB::CChunkB(
 //
 ////---------------------------------------------------
 bool CChunkB::process(void* pcmparrRawSignalCur
-	, std::vector<COutChunkHeader>* pvctSuccessHeaders)
+	, std::vector<COutChunkHeader>* pvctSuccessHeaders,std::vector<float>* vecImg)
 {
 	
 	return true;
