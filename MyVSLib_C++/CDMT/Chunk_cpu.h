@@ -45,7 +45,7 @@ public:
 	
 	//-------------------------------------------------------------------------
 	virtual bool process(void* pcmparrRawSignalCur
-		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<float>* vecImg);
+		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg);
 
 	void compute_chirp_channel(std::vector<std::complex<float>>* parr_dc, const  std::vector<float>* parr_coh_dm);
 
@@ -61,26 +61,6 @@ public:
 	static void roll_(T* arr, const int lenarr, const int ishift);
 
 	void fnc_dedisperse(float* parr_wfall, const float dm, const float  tsamp);
-
-	inline int get_noverlap_per_channel()
-	{
-		return m_noverlap / m_len_sft;
-	};
-
-	inline int get_mbin_adjusted()
-	{		
-		return get_mbin() - 2 * get_noverlap_per_channel();
-	}
-
-	inline int get_mbin()
-	{
-		return  m_nbin / m_len_sft;
-	}
-
-	inline int get_msamp()
-	{
-		return m_nfft * get_mbin_adjusted();
-	}
 
 	//bool detect_signal(fdmt_type_* arr, fdmt_type_* norm, const int Rows, const int  Cols, structOutDetection* pstrOut);
 

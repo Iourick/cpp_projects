@@ -70,8 +70,28 @@ public:
 	int m_noverlap;
 	//-------------------------------------------------------------------------
 	virtual bool process(void* pcmparrRawSignalCur
-		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<float>* vecImg);
+		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg);
 
+
+	inline int get_noverlap_per_channel()
+	{
+		return m_noverlap / m_len_sft;
+	};
+
+	inline int get_mbin_adjusted()
+	{
+		return get_mbin() - 2 * get_noverlap_per_channel();
+	}
+
+	inline int get_mbin()
+	{
+		return  m_nbin / m_len_sft;
+	}
+
+	inline int get_msamp()
+	{
+		return m_nfft * get_mbin_adjusted();
+	}
 
 
 //

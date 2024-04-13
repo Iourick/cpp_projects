@@ -136,7 +136,7 @@ CChunk_cpu::CChunk_cpu(
 
 ////---------------------------------------------------
 bool CChunk_cpu::process(void* pcmparrRawSignalCur
-	, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<float>* pvecImg)
+	, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg)
 {	
 	// 1. 
 	const int mbin = get_mbin();
@@ -171,15 +171,25 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 
 
 	float* parr_cdmt_transform = nullptr;
+
+	std::vector<std::vector<float>>* pvecImg_temp = nullptr;
 	if (nullptr != pvecImg)
 	{
-		pvecImg->resize(m_coh_dm_Vector.size() * m_len_sft * msamp);
-		
-		parr_cdmt_transform = pvecImg->data();
+		pvecImg->resize(m_coh_dm_Vector.size() );
+		for (auto& row : *pvecImg)
+		{
+			row.resize(msamp * m_len_sft);
+		}		
+		pvecImg_temp = pvecImg;
 	}
 	else 
 	{
-		parr_cdmt_transform = (float*)malloc(m_coh_dm_Vector.size() * m_len_sft * msamp * sizeof(float));
+		pvecImg_temp = new std::vector<std::vector<float>>;
+		pvecImg_temp->resize(m_coh_dm_Vector.size() );
+		for (auto& row : *pvecImg_temp)
+		{
+			row.resize(msamp * m_len_sft);
+		}
 	}
 	
 	// !4
@@ -270,7 +280,11 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 	// 13!	
 		
 	// 14. FDMT-processing		
-		fdmt.process_image(parr_wfall, &parr_cdmt_transform[m_len_sft * msamp* idm], false);
+		//fdmt.process_image(parr_wfall, &parr_cdmt_transform[m_len_sft * msamp * idm], false);
+		
+		fdmt.process_image(parr_wfall, pvecImg_temp->at(0).data(), false);
+		
+		//pvecImg->resize(m_coh_dm_Vector.size() * m_len_sft, msamp);
 	// 14!			
 	}	
 			//std::vector<float> vec(parr_cdmt_transform, parr_cdmt_transform + msamp * m_len_sft * m_coh_dm_Vector.size());
@@ -289,7 +303,7 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 	}
 	else
 	{
-		free(parr_cdmt_transform);
+		free(pvecImg_temp);
 	}
 	return true;
 }

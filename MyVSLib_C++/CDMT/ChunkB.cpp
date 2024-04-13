@@ -168,7 +168,7 @@ CChunkB::CChunkB(
 //
 ////---------------------------------------------------
 bool CChunkB::process(void* pcmparrRawSignalCur
-	, std::vector<COutChunkHeader>* pvctSuccessHeaders,std::vector<float>* vecImg)
+	, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg)
 {
 	
 	return true;

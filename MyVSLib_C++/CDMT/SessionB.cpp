@@ -9,6 +9,7 @@
 #include "CFdmtC.h"
 #include <stdlib.h>
 #include <fftw3.h>
+
 //#include "Fragment.h"
 
 //#include "yr_cart.h"
@@ -106,7 +107,7 @@ int CSessionB::calcQuantBlocks(unsigned long long* pilength)
 }
 
 //---------------------------------------------------------------
-int CSessionB::launch()
+int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
 {
     // calc quantity sessions
     unsigned long long ilength = 0;
@@ -208,8 +209,8 @@ int CSessionB::launch()
         return 1;
     }    
     openFileReadingStream(prb_File);    
-    std::vector<float>* pvecImg = new std::vector<float>;
-
+   //std::vector<float>* pvecImg = new std::vector<float>;
+  //  std::vector<std::vector<float>>* pvecImg = new std::vector<std::vector<float>>;
     for (int nB = 0; nB < IBlock; ++nB)        
     {          
         std::cout << "                               BLOCK=  " << nB <<std::endl;  
@@ -238,7 +239,7 @@ int CSessionB::launch()
            (*ppChunk)->process(pcmparrRawSignalCur, m_pvctSuccessHeaders, pvecImg);
           
         }
-        
+        *pmsamp = (*ppChunk)-> get_msamp();
         
 
         //std::cout << "/*****************************************************/ " << std::endl;
@@ -528,7 +529,6 @@ bool CSessionB::navigateToBlock(FILE* rb_File,const int IBlockNum)
 {  
     return true;
 }
-
 
 
 //

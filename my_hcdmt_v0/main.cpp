@@ -103,6 +103,71 @@ void showInputString(char* pPathLofarFile, char* pPathOutFold, float length_of_p
     std::cout << "nbins =        " << nbins << std::endl;
     std::cout << "nfft =        " << nfft << std::endl;
 }
+//-------------------------------------------------------------------
+
+bool launch_file_processing(TYPE_OF_INP_FORMAT INP_FORMAT, char* pPathInpFile, char* pPathOutFold, const float length_of_pulse
+    , const float valD_min, const float  valD_max, const float sigma_Bound, const int lenWindow, const int  nbin, const int  nfft
+ , std::vector<std::vector<float>> *pvecImg,  int * pmsamp)
+{
+    CSessionB* pSession = nullptr;
+   
+    CSession_lofar_cpu* pSess_lofar = nullptr;
+    switch (INP_FORMAT)
+    {
+    case GUPPI:
+        // pSess_guppi = new CSession_gpu_guppi(pPathInpFile, pPathOutFold, length_of_pulse, valD_max, sigma_Bound, lenWindow,lenChunk);
+        // pSession = pSess_guppi;
+        break;
+
+    case FLOFAR:
+        pSess_lofar = new CSession_lofar_cpu(pPathInpFile, pPathOutFold, length_of_pulse
+            , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
+        pSession = pSess_lofar;
+        break;
+
+    default:
+        return -1;
+
+    }
+    
+    if (-1 == pSession->launch(pvecImg, pmsamp))
+    {
+        pSession = nullptr;
+        
+        if (pSess_lofar)
+        {
+            delete   pSess_lofar;
+        }
+        return -1;
+    }
+
+    if (pSession->m_pvctSuccessHeaders->size() > 0)
+    {
+        std::cout << "               Successful Chunk Numbers = " << pSession->m_pvctSuccessHeaders->size() << std::endl;
+        //--------------------------------------
+
+        char charrTemp[200] = { 0 };
+        for (int i = 0; i < pSession->m_pvctSuccessHeaders->size(); ++i)
+        {
+            memset(charrTemp, 0, 200 * sizeof(char));
+            (*(pSession->m_pvctSuccessHeaders))[i].createOutStr(charrTemp);
+            std::cout << i + 1 << ". " << charrTemp << std::endl;
+        }
+    }
+    else
+    {
+        std::cout << "               Successful Chunk Were Not Detected= " << std::endl;
+        return 0;
+    }
+
+    char outputlogfile[300] = { 0 };
+    strcpy(outputlogfile, "output.log");
+    COutChunkHeader::writeReport(outputlogfile, pSession->m_pvctSuccessHeaders
+        , length_of_pulse);
+
+    pSession = nullptr;
+
+}
 int main(int argc, char** argv)
 {
     /*int block = 105;
@@ -179,8 +244,9 @@ int main(int argc, char** argv)
     return -1;
 
     } 
-
-    if (-1 == pSession->launch())
+    std::vector<std::vector<float>> vecImg;
+    int  msamp = -1;
+    if (-1 == pSession->launch(&vecImg, &msamp))
     {
         pSession = nullptr;
         /* if (pSess_guppi)

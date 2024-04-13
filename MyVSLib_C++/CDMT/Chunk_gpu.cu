@@ -135,8 +135,8 @@
 	//
 	//
 	////---------------------------------------------------
-	bool CChunk_gpu:: process(void* pcmparrRawSignalCur
-		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<float>* vecImg)
+	bool CChunk_gpu::process(void* pcmparrRawSignalCur
+		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg)
 	{
 
 		return true;

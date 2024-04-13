@@ -41,7 +41,7 @@ public:
 
 	//-------------------------------------------------------------------------
 	virtual bool process(void* pcmparrRawSignalCur
-		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<float>* vecImg);
+		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg);
 
 	virtual bool try0();
 

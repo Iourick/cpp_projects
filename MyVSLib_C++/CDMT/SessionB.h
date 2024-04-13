@@ -57,7 +57,7 @@ public:
 
 	virtual bool closeFileReadingStream(FILE**& prb_File);
 
-	int launch();	
+	int launch(std::vector<std::vector<float>>* pvecImg, int* pmsamp)	;
 
 	bool analyzeChunk(const COutChunkHeader outChunkHeader, CFragment* pFRg);
 
