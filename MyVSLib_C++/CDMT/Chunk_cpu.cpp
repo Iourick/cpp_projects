@@ -82,14 +82,8 @@ CChunk_cpu::CChunk_cpu(
 		,  noverlap
 		,  tsamp)
 {
-	// 1. create coh_dm array
-	const double coh_dm_step = m_d_max / m_ncoherent;
-	const int ndm = (m_d_max - m_d_min) / coh_dm_step;
-	m_coh_dm_Vector.resize(ndm);
-	for (int i = 0; i < ndm; ++i) {
-		m_coh_dm_Vector[i] = m_d_min + i * coh_dm_step;
-	}
-	// 1!
+	// 1.
+	const int ndm = m_coh_dm_Vector.size();
 
 	//2.create dc vector
 	m_dc_Vector.resize(ndm * m_nchan * m_nbin);

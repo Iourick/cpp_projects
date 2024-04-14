@@ -75,7 +75,18 @@
 	// total time
 	long long  iTotal_time = 0;
 
-
+	CChunk_gpu::~CChunk_gpu()
+	{
+		if (m_pd_arrcoh_dm)
+		{
+			cudaFree(m_pd_arrcoh_dm);
+		}
+		if (m_pd_arrdc)
+		{
+			cudaFree(m_pd_arrdc);
+		}
+	}
+	//-----------------------------------------------------------
 	CChunk_gpu::CChunk_gpu() :CChunkB()
 	{
 
@@ -84,6 +95,13 @@
 
 	CChunk_gpu::CChunk_gpu(const  CChunk_gpu& R) :CChunkB(R)
 	{
+		cudaMalloc(&m_pd_arrcoh_dm, R.m_coh_dm_Vector.size() * sizeof(float));
+		cudaMemcpy(m_pd_arrcoh_dm, R.m_pd_arrcoh_dm, m_coh_dm_Vector.size() * sizeof(float), cudaMemcpyDeviceToDevice);
+
+		cudaMalloc(&m_pd_arrdc, R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(float));
+		cudaMemcpy(m_pd_arrdc, R.m_pd_arrdc,   R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(float), cudaMemcpyDeviceToDevice);
+
+
 	}
 	//-------------------------------------------------------------------
 
@@ -94,6 +112,12 @@
 			return *this;
 		}
 		CChunkB:: operator= (R);
+
+		cudaMalloc(&m_pd_arrcoh_dm, R.m_coh_dm_Vector.size() * sizeof(float));
+		cudaMemcpy(m_pd_arrcoh_dm, R.m_pd_arrcoh_dm, m_coh_dm_Vector.size() * sizeof(float), cudaMemcpyDeviceToDevice);
+
+		cudaMalloc(&m_pd_arrdc, R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(float));
+		cudaMemcpy(m_pd_arrdc, R.m_pd_arrdc, R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(float), cudaMemcpyDeviceToDevice);
 		return *this;
 	}
 	//------------------------------------------------------------------
@@ -130,7 +154,25 @@
 			, noverlap
 			, tsamp)
 	{
+		// 1.
+		const int ndm = m_coh_dm_Vector.size();
+		// 1!
+
+		cudaMalloc(&m_pd_arrcoh_dm, ndm * sizeof(float));
+		cudaMemcpy(m_pd_arrcoh_dm, m_coh_dm_Vector.data(), ndm * sizeof(float), cudaMemcpyHostToDevice);
+
+		cudaMalloc(&m_pd_arrdc, ndm * m_nchan * m_nbin * sizeof(float));
+
+		int mbin = get_mbin();
+
+		kernel_compute_chirp_channel(m_pd_arrdc, m_pd_arrcoh_dm, m_Fmin, m_Fmax, m_nbin, m_len_sft, mbin  );
 	}
+
+__global__
+void kernel_compute_chirp_channel(float *m_pd_arrdc, float* m_pd_arrcoh_dm, const float Fmin, const float Fmax, const int nbin, const int len_sft, const int mbin)
+{
+
+}
 
 	//
 	//

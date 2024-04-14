@@ -43,5 +43,6 @@ public:
 };
 
 
-__global__ void unpackInput_L(cufftComplex* pcmparrRawSignalCur, inp_type_* d_parrInput, const int  lenChunk
-	, const int  NChan, const int  npol);
+__global__
+void unpackInput_lofar(cufftComplex* pcmparrRawSignalCur, inp_type_* d_parrInput, const int NPolPh, const int LenChunk, const int nbin, const int  Noverlap);
+

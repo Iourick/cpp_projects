@@ -13,6 +13,7 @@
 #include <cufft.h>
 #include "ChunkB.h"
 #include "Chunk_gpu.cuh"
+#include "npy.hpp"
 
 cudaError_t cudaStatus;
 
@@ -51,20 +52,29 @@ CSession_lofar_gpu::CSession_lofar_gpu(const char* strGuppiPath, const char* str
 //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-bool  CSession_lofar_gpu::unpack_chunk(const long long lenChunk, const int j, inp_type_* d_parrInput, void* pcmparrRawSignalCur)
+bool  CSession_lofar_gpu::unpack_chunk(const long long LenChunk, const int Noverlap, inp_type_* d_parrInput, void* pcmparrRawSignalCur)
 {
     cudaDeviceSynchronize();
 
     cudaStatus = cudaGetLastError();
     if (cudaStatus != cudaSuccess) {
         fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
-        // Handle the error appropriately
+        return false;
     }
     //
-    const dim3 block_size(1024, 1, 1);
-    const dim3 gridSize((lenChunk + block_size.x - 1) / block_size.x, 1, 1);
+    const dim3 block_size(512, 1, 1);
+    const dim3 gridSize((m_nbin + block_size.x - 1) / block_size.x, m_header.m_nchan, m_nfft);
 
-    unpackInput_L <<< gridSize, block_size >> > ((cufftComplex * )pcmparrRawSignalCur, (inp_type_*)d_parrInput, lenChunk, m_header.m_nchan, m_header.m_npol);
+    unpackInput_lofar << < gridSize, block_size >> > ((cufftComplex*)pcmparrRawSignalCur, (inp_type_*)d_parrInput, m_header.m_npol / 2, LenChunk, m_nbin, Noverlap);
+
+
+    int lenarr =  m_nbin * m_header.m_nchan * m_nfft;
+     std::vector<std::complex<float>> data2(lenarr, 0);
+    cudaMemcpy(data2.data(), pcmparrRawSignalCur, lenarr* sizeof(std::complex<float>),
+        cudaMemcpyDeviceToHost);
+    cudaDeviceSynchronize();
+    std::array<long unsigned, 1> leshape127{ lenarr };
+    npy::SaveArrayAsNumpy("inp.npy", false, leshape127.size(), leshape127.data(), data2);
     return true;
 }
 //--------------------------------------------------------------------------------------------
@@ -123,29 +133,80 @@ void CSession_lofar_gpu::createChunk(CChunkB** ppchunk
 //-----------------------------------------------------------------------
 
 __global__
-void unpackInput_L(cufftComplex* pcmparrRawSignalCur, inp_type_* d_parrInput, const int  lenChunk
-    , const int  NChan, const int  npol)
+void unpackInput_lofar(cufftComplex* pcmparrRawSignalCur, inp_type_* d_parrInput, const int NPolPh, const int LenChunk   , const int nbin, const int  Noverlap)
 {
-    const int itime = threadIdx.x + blockDim.x * blockIdx.x; // down channels, number of channel
-    if (itime >= lenChunk)
+    const int ibin = threadIdx.x + blockDim.x * blockIdx.x; // down channels, number of channel, inside fft
+    if (ibin >= nbin )
     {
         return;
     }
-    int numColInp0 = itime * NChan;
+    const int  NChan = gridDim.y;
+    const int nfft = gridDim.z;
+    const int  isub = blockIdx.y;
+    const int ifft = blockIdx.z;
+    int idx = ifft * NChan * nbin + isub * nbin + ibin;
+    int isamp = ibin + (nbin - 2 * Noverlap) * ifft - Noverlap;
 
-    int colsInp = lenChunk * NChan;
-
-
-    for (int i = 0; i < NChan; ++i)
+    if ((isamp >= 0) && (isamp < LenChunk))
     {
-        for (int j = 0; j < npol / 2; ++j)
+        int idx_inp = isamp * NChan + isub;
+        pcmparrRawSignalCur[idx].x = (float)d_parrInput[idx_inp];
+        pcmparrRawSignalCur[idx].y = (float)d_parrInput[LenChunk * NChan + idx_inp];
+        if (NPolPh == 2)
         {
-            pcmparrRawSignalCur[(i * npol / 2 + j) * lenChunk + itime].x
-                = (float)d_parrInput[j * npol / 2 * colsInp + numColInp0 + i];
-            pcmparrRawSignalCur[(i * npol / 2 + j) * lenChunk + itime].y
-                = (float)d_parrInput[(1 + j * npol / 2) * colsInp + numColInp0 + i];
+            idx += nfft * NChan * nbin;
+            idx_inp += 2 * NChan * LenChunk;
+            pcmparrRawSignalCur[idx].x = (float)d_parrInput[idx_inp];
+            pcmparrRawSignalCur[idx].y = (float)d_parrInput[LenChunk * NChan + idx_inp];
         }
     }
+    else
+    {
+       
+        pcmparrRawSignalCur[idx].x = 0.0f;
+        pcmparrRawSignalCur[idx].y = 0.0f;
+        if (NPolPh == 2)
+        {
+            idx += nfft * NChan * nbin;
 
+            pcmparrRawSignalCur[idx].x = 0.0f;
+            pcmparrRawSignalCur[idx].y = 0.0f;
+        }
+    }
+    
 }
+////bool CSession_lofar_cpu::unpack_chunk(const long long LenChunk, const int Noverlap
+//    , inp_type_* d_parrInput, void* pcmparrRawSignalCur)
+//{
+//    if (LenChunk != ((m_nbin - 2 * Noverlap) * m_nfft))
+//    {
+//        printf("LenChunk is not true");
+//        return false;
+//    }
+//    for (int k = 0; k < m_header.m_npol / 2; ++k)
+//    {
+//        fftwf_complex* pout_begin = &((fftwf_complex*)pcmparrRawSignalCur)[m_nfft * m_header.m_nchan * m_nbin * k];
+//        inp_type_* arrRe = &d_parrInput[2 * k * m_header.m_nchan * LenChunk];
+//        inp_type_* arrIm = &d_parrInput[(1 + 2 * k) * m_header.m_nchan * LenChunk];
 //
+//        for (int ifft = 0; ifft < m_nfft; ++ifft)
+//        {
+//            for (int isub = 0; isub < m_header.m_nchan; ++isub)
+//            {
+//                for (int ibin = 0; ibin < m_nbin; ++ibin)
+//                {
+//                    int isamp = ibin + (m_nbin - 2 * Noverlap) * ifft - Noverlap;
+//                    if ((isamp >= 0) && (isamp < LenChunk))
+//                    {
+//                        int idx2 = isub + m_header.m_nchan * isamp;
+//                        int iii = arrRe[idx2];
+//                        pout_begin[ifft * m_nbin * m_header.m_nchan + isub * m_nbin + ibin][0] = (inp_type_)arrRe[idx2];
+//                        pout_begin[ifft * m_nbin * m_header.m_nchan + isub * m_nbin + ibin][1] = (inp_type_)arrIm[idx2];
+//                    }
+//                }
+//            }
+//        }
+//    }
+//    return true;
+//}
+

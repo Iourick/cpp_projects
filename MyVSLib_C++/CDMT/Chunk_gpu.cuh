@@ -17,6 +17,7 @@ class CTelescopeHeader;
 class CChunk_gpu : public CChunkB
 {
 public:
+	~CChunk_gpu();
 	CChunk_gpu();
 	CChunk_gpu(const  CChunk_gpu& R);
 	CChunk_gpu& operator=(const CChunk_gpu& R);
@@ -38,6 +39,9 @@ public:
 		, const int noverlap
 		, const float tsamp
 	);
+	//---------------------------------------------------------------------------------------
+	float* m_pd_arrcoh_dm;
+	float* m_pd_arrdc;
 
 	//-------------------------------------------------------------------------
 	virtual bool process(void* pcmparrRawSignalCur
@@ -95,6 +99,9 @@ public:
 		, cufftComplex** ppcarrBuff, char** ppInpOutBuffFdmt,  CChunk_gpu** ppChunk);
 
 };
+__global__
+void kernel_compute_chirp_channel(float* m_pd_arrdc, float* m_pd_arrcoh_dm, const float Fmin, const float Fmax, const int nbin, const int len_sft, const int mbin);
+
 
 __global__
 void scaling_kernel(cufftComplex* data, long long element_count, float scale);

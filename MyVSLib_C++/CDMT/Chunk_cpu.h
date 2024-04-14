@@ -37,7 +37,7 @@ public:
 
 	std::vector<std::complex<float>> m_dc_Vector;
 
-	std::vector<float> m_coh_dm_Vector;
+	
 
 	char m_str_wis_forw[STR_WIS_LEN];
 

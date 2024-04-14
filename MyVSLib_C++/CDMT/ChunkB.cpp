@@ -54,6 +54,9 @@ void emitSound(int frequency, int duration) {
 //long long  iTotal_time = 0;
 
 //
+CChunkB::~CChunkB()
+{
+}
 CChunkB::CChunkB()
 {
 	m_Fmin = 0;
@@ -96,6 +99,7 @@ CChunkB::CChunkB(const  CChunkB& R)
 	m_noverlap = R.m_noverlap;
 	m_ncoherent = R.m_ncoherent;
 	m_tsamp = R.m_tsamp;
+	m_coh_dm_Vector = R.m_coh_dm_Vector;
 }
 //-------------------------------------------------------------------
 
@@ -121,6 +125,7 @@ CChunkB& CChunkB::operator=(const CChunkB& R)
 	m_noverlap = R.m_noverlap;
 	m_ncoherent = R.m_ncoherent;
 	m_tsamp = R.m_tsamp;
+	m_coh_dm_Vector = R.m_coh_dm_Vector;
 	return *this;
 }
 //------------------------------------------------------------------
@@ -162,6 +167,14 @@ CChunkB::CChunkB(
 	m_nfft = nfft;
 	m_noverlap = noverlap;
 	m_tsamp = tsamp;
+	//  create coh_dm array
+	const double coh_dm_step = m_d_max / m_ncoherent;
+	const int ndm = (m_d_max - m_d_min) / coh_dm_step;
+	m_coh_dm_Vector.resize(ndm);
+	for (int i = 0; i < ndm; ++i) {
+		m_coh_dm_Vector[i] = m_d_min + i * coh_dm_step;
+	}
+	
 }
 
 //

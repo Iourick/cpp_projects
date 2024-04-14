@@ -19,8 +19,13 @@ class CChunk_cpu;
  
 enum TYPE_OF_INP_FORMAT
 {
-	 GUPPI
-	,FLOFAR
+	GUPPI
+	, FLOFAR
+};
+enum TYPE_OF_PROCESSOR
+{
+	CPU
+	, GPU
 };
 
 class CSessionB

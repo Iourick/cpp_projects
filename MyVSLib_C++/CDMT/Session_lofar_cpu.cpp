@@ -116,8 +116,7 @@ bool CSession_lofar_cpu::unpack_chunk(const long long LenChunk, const int Noverl
                     int isamp = ibin + (m_nbin - 2 * Noverlap) * ifft - Noverlap;
                     if ((isamp >= 0) && (isamp < LenChunk))
                     {
-                        int idx2 = isub + m_header.m_nchan * isamp;
-                        int iii = arrRe[idx2];
+                        int idx2 = isub + m_header.m_nchan * isamp;                        
                         pout_begin[ifft * m_nbin * m_header.m_nchan + isub * m_nbin + ibin][0] = (inp_type_)arrRe[idx2];
                         pout_begin[ifft * m_nbin * m_header.m_nchan + isub * m_nbin + ibin][1] = (inp_type_)arrIm[idx2];
                     }

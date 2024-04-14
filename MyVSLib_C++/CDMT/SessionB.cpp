@@ -160,7 +160,7 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
    // total number of downloding bytes to each chunk:
        const long long QUantChunkBytes = calc_ChunkBytes(LenChunk);
     // total number of downloding bytes to each channel:
-       const long long QUantTotalChannelBytes = calc_TotalChannelBytes();
+    const long long QUantTotalChannelBytes = calc_TotalChannelBytes();
     const long long QUantChunkComplexNumbers = calc_ChunkComplexNumbers();
     const long long QUantDownloadingBytesForChunk = calc_ChunkBytes(LenChunk);
     const long long QUantOverlapBytes= calc_ChunkBytes(Noverlap); 

@@ -25,6 +25,7 @@
 #include "SessionB.h"
 #include "Fragment.h"
 #include "Session_lofar_cpu.h"
+#include "Session_lofar_gpu.cuh"
 
 #define _CRT_SECURE_NO_WARNINGS
 using namespace std;
@@ -36,6 +37,8 @@ using namespace std;
 char PathInpFile[] = "D://BASSA//hdf5_data//L2012176_SAP000_B000_S0_P001_bf.h5";
 char PathOutFold[] = "OutPutFold";
 TYPE_OF_INP_FORMAT INP_FORMAT = FLOFAR;
+TYPE_OF_PROCESSOR PROCESSOR = GPU;
+
 char* pPathInpFile = PathInpFile;
 char* pPathOutFold = PathOutFold;
 double valD_min = 30.0;
@@ -105,13 +108,14 @@ void showInputString(char* pPathLofarFile, char* pPathOutFold, float length_of_p
 }
 //-------------------------------------------------------------------
 
-bool launch_file_processing(TYPE_OF_INP_FORMAT INP_FORMAT, char* pPathInpFile, char* pPathOutFold, const float length_of_pulse
+bool launch_file_processing(TYPE_OF_PROCESSOR PROCESSOR, TYPE_OF_INP_FORMAT INP_FORMAT, char* pPathInpFile, char* pPathOutFold, const float length_of_pulse
     , const float valD_min, const float  valD_max, const float sigma_Bound, const int lenWindow, const int  nbin, const int  nfft
  , std::vector<std::vector<float>> *pvecImg,  int * pmsamp)
 {
     CSessionB* pSession = nullptr;
    
-    CSession_lofar_cpu* pSess_lofar = nullptr;
+    CSession_lofar_cpu* pSess_lofar_cpu = nullptr;
+    CSession_lofar_gpu* pSess_lofar_gpu = nullptr;
     switch (INP_FORMAT)
     {
     case GUPPI:
@@ -120,9 +124,21 @@ bool launch_file_processing(TYPE_OF_INP_FORMAT INP_FORMAT, char* pPathInpFile, c
         break;
 
     case FLOFAR:
-        pSess_lofar = new CSession_lofar_cpu(pPathInpFile, pPathOutFold, length_of_pulse
-            , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
-        pSession = pSess_lofar;
+        switch (PROCESSOR)
+        {
+        case CPU:
+            pSess_lofar_cpu = new CSession_lofar_cpu(pPathInpFile, pPathOutFold, length_of_pulse
+                , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
+            pSession = pSess_lofar_cpu;
+            break;
+
+        case GPU:
+            pSess_lofar_gpu = new CSession_lofar_gpu(pPathInpFile, pPathOutFold, length_of_pulse
+                , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
+            pSession = pSess_lofar_gpu;
+            break;
+        default: break;
+        }       
         break;
 
     default:
@@ -134,9 +150,14 @@ bool launch_file_processing(TYPE_OF_INP_FORMAT INP_FORMAT, char* pPathInpFile, c
     {
         pSession = nullptr;
         
-        if (pSess_lofar)
+        if (pSess_lofar_cpu)
         {
-            delete   pSess_lofar;
+            delete   pSess_lofar_cpu;
+        }
+
+        if (pSess_lofar_gpu)
+        {
+            delete   pSess_lofar_gpu;
         }
         return -1;
     }
@@ -225,8 +246,9 @@ int main(int argc, char** argv)
 
 
     CSessionB* pSession = nullptr;
-    //CSession_gpu_guppi* pSess_guppi = NULL;
-    CSession_lofar_cpu* pSess_lofar = nullptr;
+
+    CSession_lofar_cpu* pSess_lofar_cpu = nullptr;
+    CSession_lofar_gpu* pSess_lofar_gpu = nullptr;
     switch (INP_FORMAT)
     {
     case GUPPI:
@@ -235,31 +257,46 @@ int main(int argc, char** argv)
         break;
 
     case FLOFAR:
-        pSess_lofar = new CSession_lofar_cpu(pPathInpFile, pPathOutFold, length_of_pulse
-            , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
-        pSession = pSess_lofar;
+        switch (PROCESSOR)
+        {
+        case CPU:
+            pSess_lofar_cpu = new CSession_lofar_cpu(pPathInpFile, pPathOutFold, length_of_pulse
+                , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
+            pSession = pSess_lofar_cpu;
+            break;
+
+        case GPU:
+            pSess_lofar_gpu = new CSession_lofar_gpu(pPathInpFile, pPathOutFold, length_of_pulse
+                , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
+            pSession = pSess_lofar_gpu;
+            break;
+        default: break;
+        }
         break;
 
     default:
-    return -1;
+        return -1;
 
-    } 
+    }
+
     std::vector<std::vector<float>> vecImg;
     int  msamp = -1;
     if (-1 == pSession->launch(&vecImg, &msamp))
     {
         pSession = nullptr;
-        /* if (pSess_guppi)
-         {
-             delete pSess_guppi;
-         }*/
 
-        if (pSess_lofar)
+        if (pSess_lofar_cpu)
         {
-            delete   pSess_lofar;
+            delete   pSess_lofar_cpu;
+        }
+
+        if (pSess_lofar_gpu)
+        {
+            delete   pSess_lofar_gpu;
         }
         return -1;
-    }
+    }   
+   
 
     int nImageRows = vecImg.size() * vecImg[0].size() / msamp;
     std::vector<float>vctData(vecImg.size() * vecImg[0].size());
@@ -297,21 +334,24 @@ int main(int argc, char** argv)
         return 0;
     }
 
+
+    pSession = nullptr;
+    if (pSess_lofar_cpu)
+    {
+        delete   pSess_lofar_cpu;
+    }
+    if (pSess_lofar_gpu)
+    {
+        delete   pSess_lofar_gpu;
+    }
+
+
     char outputlogfile[300] = { 0 };
     strcpy(outputlogfile, "output.log");
     COutChunkHeader::writeReport(outputlogfile, pSession->m_pvctSuccessHeaders
         , length_of_pulse);
 
-    pSession = nullptr;
-    /* if (pSess_guppi)
-     {
-         delete pSess_guppi;
-     }*/
-
-    if (pSess_lofar)
-    {
-        delete   pSess_lofar;
-    }
+    
 
 
     //
