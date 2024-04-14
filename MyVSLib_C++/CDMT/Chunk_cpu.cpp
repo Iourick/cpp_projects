@@ -282,7 +282,7 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 	// 14. FDMT-processing		
 		//fdmt.process_image(parr_wfall, &parr_cdmt_transform[m_len_sft * msamp * idm], false);
 		
-		fdmt.process_image(parr_wfall, pvecImg_temp->at(0).data(), false);
+		fdmt.process_image(parr_wfall, pvecImg_temp->at(idm).data(), false);
 		
 		//pvecImg->resize(m_coh_dm_Vector.size() * m_len_sft, msamp);
 	// 14!			
@@ -299,7 +299,7 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 
 	if (nullptr != pvecImg)
 	{
-		parr_cdmt_transform = nullptr;
+		pvecImg_temp = nullptr;
 	}
 	else
 	{

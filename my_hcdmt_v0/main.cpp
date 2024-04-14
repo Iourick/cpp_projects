@@ -261,6 +261,23 @@ int main(int argc, char** argv)
         return -1;
     }
 
+    int nImageRows = vecImg.size() * vecImg[0].size() / msamp;
+    std::vector<float>vctData(vecImg.size() * vecImg[0].size());
+    float* pntOut = vctData.data();
+    for (int i = 0; i < vecImg.size(); ++i)
+    {
+        memcpy(&pntOut[i * vecImg[0].size()], vecImg[i].data(), vecImg[0].size() * sizeof(float));
+    }
+        std::array<long unsigned, 2> leshape101{ nImageRows, msamp };
+    
+        npy::SaveArrayAsNumpy("out_image.npy", false, leshape101.size(), leshape101.data(), vctData);
+        #ifdef _WIN32 // Windows
+        char filename_gpu[] = "image_gpu.png";
+        createImg_(argc, argv, vctData, nImageRows, msamp, filename_gpu);
+    #else
+    #endif 
+        
+
     if (pSession->m_pvctSuccessHeaders->size() > 0)
     {
         std::cout << "               Successful Chunk Numbers = " << pSession->m_pvctSuccessHeaders->size() << std::endl;
@@ -295,6 +312,8 @@ int main(int argc, char** argv)
     {
         delete   pSess_lofar;
     }
+
+
     //
     //    char chInp[200] = { 0 };
     //    std::cout << "if you  want to quit, print q" << endl;
@@ -392,7 +411,7 @@ int main(int argc, char** argv)
     //    createImg_(argc, argv, v, dim, dim, filename_gpu);
     //#else
     //#endif 
-    //
+    
 
     return 0;
 }

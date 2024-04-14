@@ -237,6 +237,9 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
            (*ppChunk)->set_blockid(nB);
            (*ppChunk)->set_chunkid(j);
            (*ppChunk)->process(pcmparrRawSignalCur, m_pvctSuccessHeaders, pvecImg);
+
+           // TEMPORARY FOR DEBUGGING LOFAR ONLY! DELETE LATER!
+           break;
           
         }
         *pmsamp = (*ppChunk)-> get_msamp();
@@ -256,14 +259,16 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
         //std::cout << "/*****************************************************/ " << std::endl;
         //std::cout << "/*****************************************************/ " << std::endl;
         //std::cout << "/*****************************************************/ " << std::endl;	
-        rewindFilePos(prb_File,   QUantTotalChannelBytes);      
+        rewindFilePos(prb_File,   QUantTotalChannelBytes);    
+
+        
     }
    closeFileReadingStream(prb_File);  
    
    freeInputMemory(parrInput, pcmparrRawSignalCur);
     
     delete (*ppChunk);
-    delete pvecImg;
+   // delete pvecImg;
     ppChunk = nullptr;    
     return 0;
 }

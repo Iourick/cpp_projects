@@ -279,44 +279,31 @@ void createImg_(int argc, char** argv, std::vector<float>& vctOut1D
     ICOLS = ICols;
     IROWS = IRows;
     ivctOut = std::vector<std::vector<int>>(IROWS, std::vector<int>(ICOLS, 0));
-    int imax = fabs(vctOut1D[0]);
+    float vmax = fabs(vctOut1D[0]);
+    for (int i = 0; i < vctOut1D.size(); ++i)
+    {
+        if (fabs(vctOut1D[i]) > vmax)
+        {
+            vmax = fabs(vctOut1D[i]);
+        }
+    }
+    float coeff = 255. / vmax;
 
     for (int i = 0; i < IROWS; ++i)
     {
         for (int j = 0; j < ICOLS; ++j)
         {
-            int t = vctOut1D[i * ICOLS + j];
-            ivctOut[i][j] = t;
-            if (fabs(t) > imax)
-            {
-                imax = t;
-            }
+            ivctOut[i][j] = int(coeff * vctOut1D[i * ICOLS + j] );
+           
         }
-    }
-    /*std::swap(ivctOut[2], ivctOut[3]);
-    int* pi = new int[ICOLS];*/
+    }   
 
     int num = IROWS / 2;
-
     for (int i = 0; i < num; ++i)
     {
         std::swap(ivctOut[i], ivctOut[IROWS - 1 - i]);
-        /*memcpy(pi, &piarrImOut[i * ICOLS], ICOLS * sizeof(int));
-        memcpy(&piarrImOut[i * ICOLS], &piarrImOut[(IROWS - 1 - i) * ICOLS], ICOLS * sizeof(int));
-        memcpy(&piarrImOut[(IROWS - 1 - i) * ICOLS], pi, ICOLS * sizeof(int));*/
-    }
-    //delete[]pi;
-    /*int imax = *std::max_element(piarrImOut, piarrImOut + ICOLS * IROWS);
-    int imin = *std::min_element(piarrImOut, piarrImOut + ICOLS * IROWS);*/
-    float coeff = 255. / (double(imax));
-    // Initialize with your data
-    for (int i = 0; i < IROWS; ++i)
-        for (int j = 0; j < ICOLS; ++j)
-        {
-            ivctOut[i][j] = (int)(coeff * ivctOut[i][j]);
-            //ivctOut[i][j] = (int)piarrImOut[i * ICOLS + j];
-
-        }
+       
+    }   
 
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB);
@@ -326,11 +313,8 @@ void createImg_(int argc, char** argv, std::vector<float>& vctOut1D
     glutDisplayFunc(display);
     // After displaying the image, save it as filename 
     saveImage(filename);
-
     // Set up other GLUT callbacks as needed (e.g., keyboard input)
-
     glutMainLoop();
-
 
     return;
 }
