@@ -68,20 +68,20 @@ bool  CSession_lofar_gpu::unpack_chunk(const long long LenChunk, const int Nover
     unpackInput_lofar << < gridSize, block_size >> > ((cufftComplex*)pcmparrRawSignalCur, (inp_type_*)d_parrInput, m_header.m_npol / 2, LenChunk, m_nbin, Noverlap);
 
 
-    int lenarr =  m_nbin * m_header.m_nchan * m_nfft;
+   /* int lenarr =  m_nbin * m_header.m_nchan * m_nfft;
      std::vector<std::complex<float>> data2(lenarr, 0);
     cudaMemcpy(data2.data(), pcmparrRawSignalCur, lenarr* sizeof(std::complex<float>),
         cudaMemcpyDeviceToHost);
     cudaDeviceSynchronize();
     std::array<long unsigned, 1> leshape127{ lenarr };
-    npy::SaveArrayAsNumpy("inp.npy", false, leshape127.size(), leshape127.data(), data2);
+    npy::SaveArrayAsNumpy("inp.npy", false, leshape127.size(), leshape127.data(), data2);*/
     return true;
 }
 //--------------------------------------------------------------------------------------------
 bool CSession_lofar_gpu::allocateInputMemory(void** d_pparrInput, const int QUantDownloadingBytesForChunk, void** pcmparrRawSignalCur
     , const int QUantChunkComplexNumbers)
 {
-    checkCudaErrors(cudaMallocManaged((void**)d_pparrInput, QUantDownloadingBytesForChunk * sizeof(char)));
+    checkCudaErrors(cudaMalloc((void**)d_pparrInput, QUantDownloadingBytesForChunk * sizeof(char)));
     checkCudaErrors(cudaMalloc((void**)pcmparrRawSignalCur, QUantChunkComplexNumbers * sizeof(cufftComplex)));
     return true;
 }
@@ -172,9 +172,31 @@ void unpackInput_lofar(cufftComplex* pcmparrRawSignalCur, inp_type_* d_parrInput
             pcmparrRawSignalCur[idx].x = 0.0f;
             pcmparrRawSignalCur[idx].y = 0.0f;
         }
-    }
-    
+    }    
 }
+
+//-----------------------------------------------------------
+
+size_t CSession_lofar_gpu::download_chunk(FILE** prb_File, char* d_parrInput, const long long QUantDownloadingBytes)
+{
+    const long long QUantDownloadingBytesForEachFile = QUantDownloadingBytes / m_header.m_npol;
+    size_t sreturn = 0;
+    char* parrInput = new char[QUantDownloadingBytes];
+    for (int i = 0; i < 4; i++)
+    {
+        size_t nread = fread(&parrInput[QUantDownloadingBytesForEachFile * i], sizeof(char), QUantDownloadingBytesForEachFile, prb_File[i]);
+        if (nread == 0)
+        {
+            delete[]parrInput;
+            break;
+        }
+        sreturn += nread;
+    }
+    cudaMemcpy(d_parrInput, parrInput, QUantDownloadingBytes, cudaMemcpyHostToDevice);
+    delete[]parrInput;
+    return sreturn;
+}
+
 ////bool CSession_lofar_cpu::unpack_chunk(const long long LenChunk, const int Noverlap
 //    , inp_type_* d_parrInput, void* pcmparrRawSignalCur)
 //{

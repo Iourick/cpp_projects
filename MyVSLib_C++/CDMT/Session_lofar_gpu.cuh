@@ -40,6 +40,8 @@ public:
 
 	virtual void freeInputMemory(void* parrInput, void* pcmparrRawSignalCur);
 
+    virtual size_t download_chunk(FILE** prb_File, char* d_parrInput, const long long QUantDownloadingBytes);
+
 };
 
 

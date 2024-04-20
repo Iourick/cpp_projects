@@ -244,8 +244,12 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 		// 10!	
 		
 		// 11.	unpadding and transposition
-		transpose_unpadd(parrElemWiseMulted,  fbuf);
-		transpose_unpadd(parrElemWiseMulted + m_nchan * m_nfft * m_nbin,  fbuf + msamp * m_nchan * m_len_sft);
+		for (int ipol = 0; ipol < m_npol / 2; ++ipol)
+		{
+			transpose_unpadd(parrElemWiseMulted + ipol * m_nchan * m_nfft * m_nbin, fbuf + ipol *msamp * m_nchan * m_len_sft);
+		}
+		/*transpose_unpadd(parrElemWiseMulted,  fbuf);
+		transpose_unpadd(parrElemWiseMulted + m_nchan * m_nfft * m_nbin,  fbuf + msamp * m_nchan * m_len_sft);*/
 		// 11!
 		
 		//12. calc intensity matrix already transposed
@@ -343,7 +347,7 @@ void CChunk_cpu::fnc_dedisperse(float* parr_wfall, const float dm, const float  
 // INPUT:
 // OUTPUT:
 //parr_dc
-void CChunk_cpu::compute_chirp_channel(std::vector<std::complex<float>>* parr_dc, const  std::vector<float>* parr_coh_dm)
+void CChunk_cpu::compute_chirp_channel(std::vector<std::complex<float>>* parr_dc, const  std::vector<double>* parr_coh_dm)
 {
 	// 1 preparations
 	double bw = m_Fmax - m_Fmin;
@@ -481,9 +485,44 @@ void CChunk_cpu::fnc_element_wise_mult(std::complex<float>* arr0, fftwf_complex*
 	}
  }
 //------------------------------------------------------------------------------------------
+//
+//void  CChunk_cpu::transpose_unpadd(fftwf_complex* arin, fftwf_complex* fbuf)
+//{
+//	int noverlap_per_channel = get_noverlap_per_channel();
+//	int mbin_adjusted = get_mbin_adjusted();
+//	const int nsub = m_nchan;
+//	const int nchan = m_len_sft;
+//	const int mbin = get_mbin();
+//#pragma omp parallel
+//	{
+//		for (int ibin = 0; ibin < mbin_adjusted; ++ibin)
+//		{
+//			int ibin_adjusted = ibin + noverlap_per_channel;
+//			for (int ichan = 0; ichan < nchan; ++ichan)
+//			{
+//				for (int ifft = 0; ifft < m_nfft; ++ifft)
+//				{
+//					int isamp = ibin + mbin_adjusted * ifft;
+//					int num = 0;
+//					for (int isub = 0; isub < nsub; ++isub)
+//					{
+//						// Select bins from valid region and reverse the frequency axis					
+//						fbuf[isamp * nsub * nchan + isub * nchan + nchan - ichan - 1][0] =
+//							arin[ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted][0];
+//						fbuf[isamp * nsub * nchan + isub * nchan + nchan - ichan - 1][1] =
+//							arin[ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted][1];
+//						++num;
+//					}
+//				}
+//			}
+//		}
+//	}
+//}
 
-void  CChunk_cpu::transpose_unpadd(fftwf_complex* arin,fftwf_complex* fbuf)
-{	
+//------------------------------------------------------------------------------------------
+
+void  CChunk_cpu::transpose_unpadd(fftwf_complex* arin, fftwf_complex* fbuf)
+{
 	int noverlap_per_channel = get_noverlap_per_channel();
 	int mbin_adjusted = get_mbin_adjusted();
 	const int nsub = m_nchan;
@@ -491,29 +530,65 @@ void  CChunk_cpu::transpose_unpadd(fftwf_complex* arin,fftwf_complex* fbuf)
 	const int mbin = get_mbin();
 #pragma omp parallel
 	{
-		for (int ibin = 0; ibin < mbin_adjusted; ++ibin)
+		for (int ifft = 0; ifft < m_nfft; ++ifft)
 		{
-			int ibin_adjusted = ibin + noverlap_per_channel;
-			for (int ichan = 0; ichan < nchan; ++ichan)
+			for (int isub = 0; isub < nsub; ++isub)
 			{
-				for (int ifft = 0; ifft < m_nfft; ++ifft)
+				for (int ichan = 0; ichan < nchan; ++ichan)
 				{
-					int isamp = ibin + mbin_adjusted * ifft;
-					int num = 0;
-					for (int isub = 0; isub < nsub; ++isub)
+					for (int ibin = 0; ibin < mbin_adjusted; ++ibin)
 					{
+						int ibin_adjusted = ibin + noverlap_per_channel;
+						int isamp = ibin + mbin_adjusted * ifft;
+
+
 						// Select bins from valid region and reverse the frequency axis					
 						fbuf[isamp * nsub * nchan + isub * nchan + nchan - ichan - 1][0] =
 							arin[ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted][0];
 						fbuf[isamp * nsub * nchan + isub * nchan + nchan - ichan - 1][1] =
 							arin[ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted][1];
-						++num;
+
+
 					}
 				}
 			}
 		}
 	}
 }
+//------------------------------------------------------------------------------------------
+//
+//void  CChunk_cpu::transpose_unpadd(fftwf_complex* arin, fftwf_complex* fbuf)
+//{
+//	int noverlap_per_channel = get_noverlap_per_channel();
+//	int mbin_adjusted = get_mbin_adjusted();
+//	const int nsub = m_nchan;
+//	const int nchan = m_len_sft;
+//	const int mbin = get_mbin();
+//#pragma omp parallel
+//	{
+//		for (int ibin = 0; ibin < mbin_adjusted; ++ibin)
+//		{
+//			int ibin_adjusted = ibin + noverlap_per_channel;
+//			for (int ichan = 0; ichan < nchan; ++ichan)
+//			{
+//				for (int ifft = 0; ifft < m_nfft; ++ifft)
+//				{
+//					int isamp = ibin + mbin_adjusted * ifft;
+//					int num = 0;
+//					for (int isub = 0; isub < nsub; ++isub)
+//					{
+//						// Select bins from valid region and reverse the frequency axis					
+//						fbuf[isamp * nsub * nchan + isub * nchan + nchan - ichan - 1][0] =
+//							arin[ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted][0];
+//						fbuf[isamp * nsub * nchan + isub * nchan + nchan - ichan - 1][1] =
+//							arin[ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted][1];
+//						++num;
+//					}
+//				}
+//			}
+//		}
+//	}
+//}
 
 //
 //

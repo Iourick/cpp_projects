@@ -443,19 +443,39 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 
 			checkCudaErrors(cufftExecC2C(m_fftPlanInverse, pcmparrRawSignalRolled1, pcmparrRawSignalRolled1, CUFFT_INVERSE));
 			//checkCudaErrors(cufftExecC2C(m_fftPlanInverse, (cufftComplex*)pcmparrRawSignalCur, (cufftComplex*)pcmparrRawSignalCur, CUFFT_INVERSE));
-			divide_cufftComplex_array_kernel << <blocks1, threads1 >> > (pcmparrRawSignalRolled1, m_npol / 2 * m_nfft * m_nchan * m_nbin, ((float)mbin));
+			
+			
+			blocks1 = (m_nfft * m_nchan * m_npol / 2 * m_nbin + threads1 - 1) / threads1;
+			divide_cufftComplex_array_kernel << <blocks1, threads1 >> > (pcmparrRawSignalRolled1, m_nfft * m_nchan * m_npol / 2 * m_nbin, ((float)mbin));
 
-			int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
+			//int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
+			//std::vector<complex<float>> data4(lenarr4, 0);
+			//cudaMemcpy(data4.data(), pcmparrRawSignalRolled1, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+			//cudaDeviceSynchronize();
+			//std::array<long unsigned, 1> leshape2{ lenarr4 };
+			//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+			//int ii = 0;
+
+
+			int noverlap_per_channel = get_noverlap_per_channel();
+			int mbin_adjusted = get_mbin_adjusted();
+			void* fbuf = NULL;
+			cudaMalloc(&fbuf, mbin_adjusted * m_nfft* m_nchan * m_len_sft * m_npol / 2 * sizeof(cufftComplex));
+			//void* fbuf = (cufftComplex*)pcmparrRawSignalCur;
+			
+			dim3 threads_per_block1(1024, 1, 1);
+			dim3 blocks_per_grid1(( mbin_adjusted + threads_per_block1.x - 1) / threads_per_block1.x, m_nchan * m_len_sft, m_nfft * m_npol/2);
+			transpose_unpadd<<< blocks_per_grid1, threads_per_block1>>>
+				((cufftComplex*)fbuf, pcmparrRawSignalRolled1, m_nfft, noverlap_per_channel
+				, mbin_adjusted, m_nchan, m_len_sft, mbin);
+
+			int lenarr4 = m_nfft * mbin_adjusted * m_nchan * m_len_sft * m_npol / 2 / 2;// *sizeof(cufftComplex));
 			std::vector<complex<float>> data4(lenarr4, 0);
-			cudaMemcpy(data4.data(), pcmparrRawSignalRolled1, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+			cudaMemcpy(data4.data(), fbuf, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
 			cudaDeviceSynchronize();
 			std::array<long unsigned, 1> leshape2{ lenarr4 };
 			npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
 			int ii = 0;
-
-			void* fbuf = NULL;
-			cudaMalloc(&fbuf, msamp * m_nchan * m_len_sft * m_npol / 2 * sizeof(cufftComplex));
-			
 
 			cudaFree(pcmparrRawSignalRolled1);
 			cudaFree(fbuf);
@@ -465,35 +485,88 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 	}
 //-----------------------------------------------------------------------------------
 //		
-//__global__	void  transpose_unpadd(cufftComplex* fbuf, cufftComplex* arin,int nfft,  int noverlap_per_channel
-//	, int mbin_adjusted, const int nchan, const int nlen_sft, const int mbin)
-//	{
-//		
+__global__	void  transpose_unpadd(cufftComplex* fbuf, cufftComplex* arin,int nfft,  int noverlap_per_channel
+	, int mbin_adjusted, const int nchan, const int nlen_sft, int mbin)	
+{
+	int  ibin = blockIdx.x * blockDim.x + threadIdx.x;
+	if (!(ibin < mbin_adjusted))
+	{
+		return;
+	}
+	int ipol = blockIdx.z / nfft;
+	int ifft = blockIdx.z % nfft;
+	int ichan = blockIdx.y / nlen_sft;
+	int ilen_sft = blockIdx.y % nlen_sft;
+	int ibin_adjusted = ibin + noverlap_per_channel;
+	int isamp = ibin + mbin_adjusted * ifft;
+	 
+	
+	// Select bins from valid region and reverse the frequency axis		
+	// float temp = arin[ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted].y;
+	 //printf("%f \n", temp);
+	
+	fbuf[ipol * mbin_adjusted * nchan * nlen_sft  +  isamp * nchan * nlen_sft + ichan * nlen_sft + nlen_sft - ilen_sft - 1].x =
+		arin[ipol * nfft * nchan * nlen_sft * mbin + ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted].x;
+	fbuf[ipol * mbin_adjusted * nchan * nlen_sft +  isamp * nchan * nlen_sft + ichan * nlen_sft + nlen_sft - ilen_sft - 1].y =
+		arin[ipol *  nfft * nchan * nlen_sft * mbin +  ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted].y;
+	//for (int ifft = 0; ifft < nfft; ++ifft)
+	//{
+	//	for (int ichan = 0; ichan < nchan; ++ichan)
+	//	{
+	//		for (int ilen_sft = 0; ilen_sft < nlen_sft; ++ilen_sft)
+	//		{
+	//			for (int ibin = 0; ibin < mbin_adjusted; ++ibin)
+	//			{
+	//				int ibin_adjusted = ibin + noverlap_per_channel;
+	//				int isamp = ibin + mbin_adjusted * ifft;
+
+
+	//				// Select bins from valid region and reverse the frequency axis					
+	//				fbuf[isamp * nchan * nlen_sft + ichan * nlen_sft + nlen_sft - ilen_sft - 1][0] =
+	//					arin[ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted][0];
+	//				fbuf[isamp * nchan * nlen_sft + ichan * nlen_sft + nlen_sft - ilen_sft - 1][1] =
+	//					arin[ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted][1];
+
+
+	//			}
+	//		}
+	//	}
+	//}
+}
+	
 //
-//			for (int ibin = 0; ibin < mbin_adjusted; ++ibin)
+//	void  CChunk_cpu::transpose_unpadd(fftwf_complex* arin, fftwf_complex* fbuf)
+//	{
+//		int noverlap_per_channel = get_noverlap_per_channel();
+//		int mbin_adjusted = get_mbin_adjusted();
+//		const int nsub = m_nchan;
+//		const int nchan = m_len_sft;
+//		const int mbin = get_mbin();
+//#pragma omp parallel
+//		{
+//			for (int ifft = 0; ifft < m_nfft; ++ifft)
 //			{
-//				int ibin_adjusted = ibin + noverlap_per_channel;
-//				for (int ilen_sft = 0; ilen_sft < nlen_sft; ++ilen_sft)
+//				for (int ichan = 0; ichan < nchan; ++ichan)
 //				{
-//					for (int ifft = 0; ifft < nfft; ++ifft)
+//					for (int ibin = 0; ibin < mbin_adjusted; ++ibin)
 //					{
+//						int ibin_adjusted = ibin + noverlap_per_channel;
 //						int isamp = ibin + mbin_adjusted * ifft;
 //						int num = 0;
-//						for (int ichan = 0; ichan < nchan; ++ichan)
+//						for (int isub = 0; isub < nsub; ++isub)
 //						{
 //							// Select bins from valid region and reverse the frequency axis					
-//							fbuf[isamp * nchan * nlen_sft + ichan * nlen_sft + nlen_sft - ilen_sft - 1][0] =
-//								arin[ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted][0];
-//							fbuf[isamp * nchan * nlen_sft + ichan * nlen_sft + nlen_sft - ilen_sft - 1][1] =
-//								arin[ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted][1];
+//							fbuf[isamp * nsub * nchan + isub * nchan + nchan - ichan - 1][0] =
+//								arin[ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted][0];
+//							fbuf[isamp * nsub * nchan + isub * nchan + nchan - ichan - 1][1] =
+//								arin[ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted][1];
 //							++num;
 //						}
 //					}
 //				}
 //			}
-//		
+//		}
 //	}
-
 	//-----------------------------------------------------------------------
 	__global__ void  divide_cufftComplex_array_kernel(cufftComplex* d_arr, int len, float val)
 	{

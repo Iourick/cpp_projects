@@ -47,7 +47,7 @@ public:
 	virtual bool process(void* pcmparrRawSignalCur
 		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg);
 
-	void compute_chirp_channel(std::vector<std::complex<float>>* parr_dc, const  std::vector<float>* parr_coh_dm);
+	void compute_chirp_channel(std::vector<std::complex<float>>* parr_dc, const  std::vector<double>* parr_coh_dm);
 
 	static void fnc_roll_and_normalize_ffted(fftwf_complex* pcmparr_ffted, const int NRows, const int NCols);
 

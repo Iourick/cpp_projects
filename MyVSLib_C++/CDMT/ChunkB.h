@@ -68,7 +68,7 @@ public:
 	int m_nbin;
 	int m_nfft;
 	int m_noverlap;
-	std::vector<float> m_coh_dm_Vector;
+	std::vector<double> m_coh_dm_Vector;
 	//-------------------------------------------------------------------------
 	virtual bool process(void* pcmparrRawSignalCur
 		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg);
