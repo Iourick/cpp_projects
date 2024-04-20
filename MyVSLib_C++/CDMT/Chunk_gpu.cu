@@ -81,26 +81,35 @@
 		{
 			cudaFree(m_pd_arrcoh_dm);
 		}
-		if (m_pd_arrdc)
+		if (m_pd_arr_dc)
 		{
-			cudaFree(m_pd_arrdc);
+			cudaFree(m_pd_arr_dc);
 		}
+
+		cufftDestroy(m_fftPlanForward);
+		cufftDestroy(m_fftPlanInverse);
 	}
 	//-----------------------------------------------------------
 	CChunk_gpu::CChunk_gpu() :CChunkB()
 	{
-
+		m_pd_arrcoh_dm = nullptr;
+		m_pd_arr_dc = nullptr;
+		
 	}
 	//-----------------------------------------------------------
 
 	CChunk_gpu::CChunk_gpu(const  CChunk_gpu& R) :CChunkB(R)
 	{
-		cudaMalloc(&m_pd_arrcoh_dm, R.m_coh_dm_Vector.size() * sizeof(float));
-		cudaMemcpy(m_pd_arrcoh_dm, R.m_pd_arrcoh_dm, m_coh_dm_Vector.size() * sizeof(float), cudaMemcpyDeviceToDevice);
+		cudaMalloc(&m_pd_arrcoh_dm, R.m_coh_dm_Vector.size() * sizeof(double));
+		cudaMemcpy(m_pd_arrcoh_dm, R.m_pd_arrcoh_dm, m_coh_dm_Vector.size() * sizeof(double), cudaMemcpyDeviceToDevice);
 
-		cudaMalloc(&m_pd_arrdc, R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(float));
-		cudaMemcpy(m_pd_arrdc, R.m_pd_arrdc,   R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(float), cudaMemcpyDeviceToDevice);
+		cudaMalloc(&m_pd_arr_dc, R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(cufftComplex));
+		cudaMemcpy(m_pd_arr_dc, R.m_pd_arr_dc,   R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(cufftComplex), cudaMemcpyDeviceToDevice);
+		m_Fdmt = R.m_Fdmt;
 
+		cufftDestroy(m_fftPlanForward);
+		cufftDestroy(m_fftPlanInverse);
+		create_fft_plans();
 
 	}
 	//-------------------------------------------------------------------
@@ -113,11 +122,17 @@
 		}
 		CChunkB:: operator= (R);
 
-		cudaMalloc(&m_pd_arrcoh_dm, R.m_coh_dm_Vector.size() * sizeof(float));
-		cudaMemcpy(m_pd_arrcoh_dm, R.m_pd_arrcoh_dm, m_coh_dm_Vector.size() * sizeof(float), cudaMemcpyDeviceToDevice);
+		cudaMalloc(&m_pd_arrcoh_dm, R.m_coh_dm_Vector.size() * sizeof(double));
+		cudaMemcpy(m_pd_arrcoh_dm, R.m_pd_arrcoh_dm, m_coh_dm_Vector.size() * sizeof(double), cudaMemcpyDeviceToDevice);
 
-		cudaMalloc(&m_pd_arrdc, R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(float));
-		cudaMemcpy(m_pd_arrdc, R.m_pd_arrdc, R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(float), cudaMemcpyDeviceToDevice);
+		cudaMalloc(&m_pd_arr_dc, R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(cufftComplex));
+		cudaMemcpy(m_pd_arr_dc, R.m_pd_arr_dc, R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(cufftComplex), cudaMemcpyDeviceToDevice);
+
+		m_Fdmt = R.m_Fdmt;
+		cufftDestroy(m_fftPlanForward);
+		cufftDestroy(m_fftPlanInverse);
+		create_fft_plans();
+
 		return *this;
 	}
 	//------------------------------------------------------------------
@@ -129,8 +144,8 @@
 		, const unsigned int len_sft
 		, const int Block_id
 		, const int Chunk_id
-		, const double d_max
-		, const double d_min
+		, const  float d_max
+		, const  float d_min
 		, const int ncoherent
 		, const float sigma_bound
 		, const int length_sum_wnd
@@ -158,392 +173,386 @@
 		const int ndm = m_coh_dm_Vector.size();
 		// 1!
 
-		cudaMalloc(&m_pd_arrcoh_dm, ndm * sizeof(float));
-		cudaMemcpy(m_pd_arrcoh_dm, m_coh_dm_Vector.data(), ndm * sizeof(float), cudaMemcpyHostToDevice);
+		cudaMalloc(&m_pd_arrcoh_dm, ndm * sizeof(double));
+		cudaMemcpy(m_pd_arrcoh_dm, m_coh_dm_Vector.data(), ndm * sizeof(double), cudaMemcpyHostToDevice);
 
-		cudaMalloc(&m_pd_arrdc, ndm * m_nchan * m_nbin * sizeof(float));
+		cudaMalloc(&m_pd_arr_dc, ndm * m_nchan * m_nbin * sizeof(cufftComplex));
 
-		int mbin = get_mbin();
-
-		kernel_compute_chirp_channel(m_pd_arrdc, m_pd_arrcoh_dm, m_Fmin, m_Fmax, m_nbin, m_len_sft, mbin  );
+		compute_chirp_channel( );
 	}
 
-__global__
-void kernel_compute_chirp_channel(float *m_pd_arrdc, float* m_pd_arrcoh_dm, const float Fmin, const float Fmax, const int nbin, const int len_sft, const int mbin)
+
+void CChunk_gpu::compute_chirp_channel()
 {
+	// 1 preparations
+	 double bw = m_Fmax - m_Fmin;
+	int mbin = get_mbin();
+	 double bw_sub = bw / m_nchan;
+	 double bw_chan = bw_sub / m_len_sft;
+	int ndm = m_coh_dm_Vector.size();
+	//1!
+
+	
+	double* d_parr_freqs_chan = nullptr;
+	cudaMalloc(&d_parr_freqs_chan, m_nchan * m_len_sft * sizeof(double));
+
+	const dim3 block_size(32, 1, 1);
+	const dim3 gridSize((m_len_sft + block_size.x - 1) / block_size.x, m_nchan, 1);
+	kernel_create_arr_freqs_chan << < gridSize, block_size >> >(d_parr_freqs_chan, m_len_sft, bw_chan, m_Fmin, bw_sub);
+	// 3!
+
+	//int lenarr1 = m_nchan * m_len_sft;// *sizeof(cufftComplex));
+	//std::vector<double> data1(lenarr1, 0);
+	//cudaMemcpy(data1.data(), d_parr_freqs_chan, lenarr1 * sizeof(double), cudaMemcpyDeviceToHost);
+	//cudaDeviceSynchronize();
+	//std::array<long unsigned, 1> leshape128{ lenarr1 };
+	//npy::SaveArrayAsNumpy("d_parr_freqs_chan.npy", false, leshape128.size(), leshape128.data(), data1);
+	
+
+	double* d_parr_taper = nullptr;
+	cudaMalloc(&d_parr_taper, mbin * sizeof(double));
+	double* d_parr_bin_freqs = nullptr;
+	cudaMalloc(&d_parr_bin_freqs, mbin * sizeof(double));
+
+	const dim3 block_Size1(1024, 1, 1);
+	const dim3 gridSize1((mbin + block_Size1.x - 1) / block_Size1.x, 1, 1);
+	kernel_create_arr_bin_freqs_and_taper << < gridSize1, block_Size1 >> > (d_parr_bin_freqs, d_parr_taper, bw_chan, mbin);
+
+	//int lenarr3 = mbin;// *sizeof(cufftComplex));
+	//std::vector<double> data3(lenarr3, 0);
+	//cudaMemcpy(data3.data(), d_parr_bin_freqs, lenarr3 * sizeof(double), cudaMemcpyDeviceToHost);
+	//cudaDeviceSynchronize();
+	//std::array<long unsigned, 1> leshape1{ lenarr3 };
+	//npy::SaveArrayAsNumpy("parr_bin_freqs.npy", false, leshape1.size(), leshape1.data(), data3);
+
+	//int lenarr4 = mbin;// *sizeof(cufftComplex));
+	//std::vector<double> data4(lenarr4, 0);
+	//cudaMemcpy(data4.data(), d_parr_taper, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+	//cudaDeviceSynchronize();
+	//std::array<long unsigned, 1> leshape2{ lenarr4 };
+	//npy::SaveArrayAsNumpy("parr_taper.npy", false, leshape2.size(), leshape2.data(), data4);
+
+
+	/*int deviceId;
+	cudaGetDevice(&deviceId);
+	cudaDeviceProp deviceProp;
+	cudaGetDeviceProperties(&deviceProp, deviceId);
+	std::cout << "Maximum number of blocks per grid: " << deviceProp.maxGridSize[0] << std::endl;
+	std::cout << "Maximum number of threads per block: " << deviceProp.maxThreadsPerBlock << std::endl;*/
+	auto start = std::chrono::high_resolution_clock::now();
+
+	const dim3 block_Size2(512,2,1);
+	const dim3 gridSize2((mbin + block_Size2.x - 1) / block_Size2.x, (m_len_sft * m_nchan + block_Size2.y - 1) / block_Size2.y, (ndm + block_Size2.z -1)/ block_Size2.z);
+	kernel_create_arr_dc << < gridSize2, block_Size2 >> > (m_pd_arr_dc, m_pd_arrcoh_dm, d_parr_freqs_chan, d_parr_bin_freqs, d_parr_taper, ndm, m_nchan, m_len_sft, mbin);
+
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	std::cout << "Time taken by function fncFdmtU_cu: " << duration.count() << " microseconds" << std::endl;
+	cudaFree(d_parr_freqs_chan);
+	cudaFree(d_parr_taper);
+	cudaFree(d_parr_bin_freqs);
+
+	//int lenarr4 = ndm* m_nchan* m_len_sft* mbin;// *sizeof(cufftComplex));
+	//std::vector<complex<float>> data4(lenarr4, 0);
+	//cudaMemcpy(data4.data(), m_pd_arr_dc, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+	//cudaDeviceSynchronize();
+	//std::array<long unsigned, 1> leshape2{ lenarr4 };
+	//npy::SaveArrayAsNumpy("arr_dc.npy", false, leshape2.size(), leshape2.data(), data4);
+
+
+	// Generate FFT plans (batch in-place)
+	create_fft_plans();
+
+
+	
 
 }
+//--------------------------------------------------------------------------------------------
+void CChunk_gpu::create_fft_plans()
+{
+	if (cufftPlanMany(&m_fftPlanForward,1, &m_nbin,
+		NULL, 1, m_nbin, // *inembed, istride, idist
+		NULL, 1, m_nbin, // *onembed, ostride, odist
+		CUFFT_C2C, m_nfft * m_nchan * m_npol / 2) != CUFFT_SUCCESS) {
+		fprintf(stderr, "CUFFT error: Plan creation failed");
+		return;
+	}
+	int mbin = get_mbin();
+	
+	checkCudaErrors(cufftPlanMany(&m_fftPlanInverse, 1, &mbin, NULL,            1,      mbin, NULL,           1,         mbin, CUFFT_C2C, m_len_sft * m_nfft * m_nchan * m_npol / 2));
+}
 
-	//
-	//
+//-------------------------------------------------------------------------------------------
+__global__
+void kernel_create_arr_dc  (cufftComplex* parr_dc, double * parrcoh_dm,double* parr_freqs_chan, double* parr_bin_freqs, double *parr_taper
+	, int ndm, int nchan, int len_sft, int mbin)
+{
+	//__shared__  double temp0[1];
+	//__shared__  int i0[1];
+	//printf("ququ");
+	int ibin = blockIdx.x * blockDim.x + threadIdx.x;
+	if (ibin >= mbin)
+	{
+		return;
+	}
+	//printf("ququ1");
+	int num1 = blockIdx.y * blockDim.y + threadIdx.y;
+	if (num1 >= nchan * len_sft)
+	{
+		return;
+	}
+	
+	int ichan = num1 / len_sft;
+	
+	int isft = num1 % len_sft;
+
+	int idm = blockIdx.z * blockDim.z + threadIdx.z;
+	if (idm >= ndm)
+	{
+		return;
+	}
+	
+
+	float temp0 = parr_freqs_chan[ichan * len_sft + isft];
+	int i0 = idm * nchan * len_sft * mbin + ichan * len_sft * mbin + isft * mbin;
+
+
+	double temp1 = parr_bin_freqs[ibin] / temp0;
+	double phase_delay=(parrcoh_dm[idm] * temp1 * temp1 / (temp0 + parr_bin_freqs[ibin]) * 4.148808e9);
+	double val_prD_int = 0;
+	double t = -modf(phase_delay, &val_prD_int) * 2.0;
+	double val_x = 0.0, val_y = 0.;
+	
+	
+	sincospi(t, &val_y, &val_x);
+	//printf("val_x = %f ;\n", (float)val_x);
+	if (val_x > 0.0)
+	{
+		//printf("val_x = % ;\n", (float)val_x);
+	}
+	parr_dc[i0 + ibin].x = float(val_x * parr_taper[ibin]);
+	parr_dc[i0 + ibin].y = float(val_y * parr_taper[ibin]);
+	
+}
+
+//------------------------------------------------------------------------------------------
+__global__
+void kernel_create_arr_bin_freqs_and_taper(double* d_parr_bin_freqs, double* d_parr_taper,  double  bw_chan,  int mbin)
+{	
+	int ind = blockIdx.x * blockDim.x + threadIdx.x;
+	if (ind >= mbin)
+	{
+		return;
+	}
+	double temp = -0.5 * bw_chan + (ind + 0.5) * bw_chan / mbin;
+	d_parr_bin_freqs[ind] = temp;
+	d_parr_taper[ind] = 1.0 / sqrt(1.0 + pow(temp / (0.47 * bw_chan), 80));
+	
+}
+//----------------------------------------------------------------------------------------
+__global__
+void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double bw_chan, double  Fmin, double bw_sub)
+{
+	int nchan = gridDim.y;
+	int ichan = blockIdx.y;	
+	int col_ind = blockIdx.x * blockDim.x + threadIdx.x;
+	 double freqs_sub = Fmin + bw_sub * (0.5 + ichan);
+	 double vi = (double)(col_ind % len_sft);
+	 double temp = bw_chan * (vi - len_sft / 2.0 + 0.5);
+	d_parr_freqs_chan[ichan * len_sft + col_ind] = freqs_sub + temp;
+}
 	////---------------------------------------------------
 	bool CChunk_gpu::process(void* pcmparrRawSignalCur
 		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg)
 	{
+		// 1. 
+		const int mbin = get_mbin();
+		const int noverlap_per_channel = get_noverlap_per_channel();
+		const int mbin_adjusted = get_mbin_adjusted();
+		const int msamp = get_msamp();
+		const int mchan = m_nchan * m_len_sft;
+		// 1!
+		
+		// 2. Forward FFT execution
+		checkCudaErrors(cufftExecC2C(m_fftPlanForward, (cufftComplex*)pcmparrRawSignalCur, (cufftComplex*)pcmparrRawSignalCur, CUFFT_FORWARD));
 
-		return true;
-	}
+		
+		//2!	
 
-	bool CChunk_gpu::try0()
-	{
-		return true;
-	}
-	//-----------------------------------------------------------------
+		//int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
+		//std::vector<complex<float>> data4(lenarr4, 0);
+		//cudaMemcpy(data4.data(), (cufftComplex*)pcmparrRawSignalCur, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+		//cudaDeviceSynchronize();
+		//std::array<long unsigned, 1> leshape2{ lenarr4 };
+		//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+		//int ii = 0;
 
-//-----------------------------------------
-bool CChunk_gpu::detailedChunkProcessing(
-	  const COutChunkHeader outChunkHeader
-	, cufftHandle plan0
-	, cufftHandle plan1
-	, cufftComplex* pcmparrRawSignalCur
-	, fdmt_type_* d_arrfdmt_norm
-	, void* pAuxBuff_fdmt
-	, cufftComplex* pcarrTemp
-	, cufftComplex* pcarrCD_Out
-	, cufftComplex* pcarrBuff
-	, char* pInpOutBuffFdmt	
-	, CFragment* pFRg)
-{
-	// 1. installation of pointers	for pAuxBuff_the_rest
-	fdmt_type_* d_parr_fdmt_inp = (fdmt_type_*)pInpOutBuffFdmt; //4	
-	fdmt_type_* d_parr_fdmt_out = (fdmt_type_*)pInpOutBuffFdmt + m_Fdmt.m_nchan * m_Fdmt.m_cols;
-	//// !1
+		//3. roll and normalize ffted signals
+		dim3 treads_per_block(256, 1);
+		dim3 blocks_per_grid((m_nbin + treads_per_block.x - 1) / treads_per_block.x, m_nfft * m_nchan * m_npol / 2);
+		
+		cufftComplex* pcmparrRawSignalRolled = NULL;
+		cudaMalloc(&pcmparrRawSignalRolled, m_nfft * m_nchan * m_npol / 2 * m_nbin * sizeof(cufftComplex));
+		dim3 threads(1024, 1);
+		dim3 blocks((m_nbin + threads.x - 1) / threads.x, m_nfft * m_nchan * m_npol / 2);
+		roll_rows_and_normalize_kernel<<< blocks, threads>>>(pcmparrRawSignalRolled, (cufftComplex*)pcmparrRawSignalCur, m_nfft * m_nchan * m_npol / 2, m_nbin, m_nbin / 2);
 
-	 
-	auto start = std::chrono::high_resolution_clock::now();
-
-
-	// 2. create FFT	
-
-	checkCudaErrors(cufftExecC2C(plan0, pcmparrRawSignalCur, pcmparrRawSignalCur, CUFFT_FORWARD));
-
-	// !2
-
-	// 3.
-
-	
-
-	/*int n_coherent = calc_n_coherent(m_Fmin, m_Fmax, m_nchan, m_len_sft, m_Fdmt.m_imaxDt);
-	cout << "n_coherent =  " << n_coherent << std::endl;*/
-	// !3
-
-	//// 4. main loop
-	
-	bool breturn = false;
-	
-
-
-	
-
-	fncCD_Multiband_gpu(pcarrCD_Out, pcmparrRawSignalCur
-		, DISPERSION_CONSTANT * outChunkHeader.m_coherentDedisp, plan0, pcarrTemp);
-
-	
-
-	//std::vector<std::complex<float>> data0(m_nbin * m_nchan * m_npol / 2, 0);
-	//cudaMemcpy(data0.data(), pcarrCD_Out, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
-	//	cudaMemcpyDeviceToHost);
-	//cudaDeviceSynchronize();
-
-	cufftResult result = cufftExecC2C(plan1, pcarrCD_Out, pcarrTemp, CUFFT_FORWARD);
-	cudaDeviceSynchronize();
-
-	/*std::vector<std::complex<float>> data(m_nbin * m_nchan * m_npol / 2, 0);
-	cudaMemcpy(data.data(), pcarrTemp, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
-		cudaMemcpyDeviceToHost);
-	cudaDeviceSynchronize();*/
-
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	iFFT_time += duration.count();
-	//
-
-	calc_fdmt_inp(d_parr_fdmt_inp, pcarrTemp, (float*)pcarrCD_Out);
-	//
-	/*std::vector<float> data(m_nbin * m_nchan * m_npol / 2, 0);
-	cudaMemcpy(data.data(), d_parr_fdmt_inp, m_nbin * m_nchan * m_npol / 2 * sizeof(float),
-		cudaMemcpyDeviceToHost);
-	std::array<long unsigned, 2> leshape129{ m_len_sft * m_nchan, m_nbin / m_len_sft };
-	npy::SaveArrayAsNumpy("fdmt_inp.npy", false, leshape129.size(), leshape129.data(), data);*/
-
-
-	start = std::chrono::high_resolution_clock::now();
-
-	end = std::chrono::high_resolution_clock::now();
-	duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	iFdmt_time += duration.count();
-
-	m_Fdmt.process_image(d_parr_fdmt_inp	, d_parr_fdmt_out, false);
-
-	float* d_fdmt_normalized = (float*)malloc(m_nbin * m_nchan * sizeof(float));
-	cudaMallocManaged((void**)&d_fdmt_normalized, m_nbin * m_nchan * sizeof(float));
-	const int Rows = m_Fdmt.m_imaxDt;
-	const int Cols = m_Fdmt.m_cols;
-	int theads = 1024;
-	int blocks = (m_nbin + theads - 1) / theads;
-	fdmt_normalization << < blocks, theads >> > (d_parr_fdmt_out, d_arrfdmt_norm, m_nbin * m_nchan, d_fdmt_normalized);
-	cudaDeviceSynchronize();
-
-	float* h_parrImage = (float*)malloc(Rows * Cols * sizeof(float));
-	windowization(d_fdmt_normalized, Rows, Cols, outChunkHeader.m_wnd_width, h_parrImage);
-
-	const int IDim = (Rows < Cols) ? Rows : Cols;
-
-	float* parrFragment = (float*)malloc(IDim * IDim * sizeof(float));
-	int iRowBegin = -1, iColBegin = -1;
-
-	cutQuadraticFragment(parrFragment, h_parrImage, &iRowBegin, &iColBegin
-		, Rows, Cols, outChunkHeader.m_nSucessRow, outChunkHeader.m_nSucessCol);
-
-	CFragment frg(parrFragment, IDim, iRowBegin, iColBegin, outChunkHeader.m_wnd_width, outChunkHeader.m_SNR, outChunkHeader.m_coherentDedisp);
-	*pFRg = frg;
-	cudaFree(d_fdmt_normalized);
-
-	free(h_parrImage);
-	free(parrFragment);
-	
-	return true;
-}
-//---------------------------------------------------
-bool CChunk_gpu::fncChunkProcessing_gpu(cufftComplex* pcmparrRawSignalCur
-	, void* pAuxBuff_fdmt
-	, cufftComplex* pcarrTemp
-	, cufftComplex* pcarrCD_Out
-	, cufftComplex* pcarrBuff
-	, char* pInpOutBuffFdmt
-	, fdmt_type_* d_arrfdmt_norm
-	, cufftHandle plan0, cufftHandle plan1	
-	, std::vector<COutChunkHeader>* pvctSuccessHeaders)
-{
-	cudaError_t cudaStatus;
-	
-	// 1. installation of pointers	for pAuxBuff_the_rest
-	fdmt_type_* d_parr_fdmt_inp = (fdmt_type_*)pInpOutBuffFdmt; //4	
-	fdmt_type_* d_parr_fdmt_out =  (fdmt_type_ *)pInpOutBuffFdmt + m_Fdmt.m_nchan * m_Fdmt.m_cols;
-	//// !1
-
-	/* std::vector<std::complex<float>> data2(m_nbin, 0);
-	cudaMemcpy(data2.data(), pcmparrRawSignalCur, m_nbin * sizeof(std::complex<float>),
-		cudaMemcpyDeviceToHost);
-	cudaDeviceSynchronize();*/
-	//std::array<long unsigned, 1> leshape127{ LEnChunk };
-	//npy::SaveArrayAsNumpy("ffted.npy", false, leshape127.size(), leshape127.data(), data);
-
-	cudaStatus = cudaGetLastError();
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
-		// Handle the error appropriately
-	}
-	auto start = std::chrono::high_resolution_clock::now();
-	
-
-	// 2. create FFT	
-	
-	checkCudaErrors(cufftExecC2C(plan0, pcmparrRawSignalCur, pcmparrRawSignalCur, CUFFT_FORWARD));
-
-	// !2
-
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	iFFT_time += duration.count();
-
-	/*std::vector<std::complex<float>> data(m_nbin * m_nchan * m_npol/2, 0);
-	cudaMemcpy(data.data(), pcmparrRawSignalCur, m_nbin * m_nchan * m_npol/2 * sizeof(std::complex<float>),
-		cudaMemcpyDeviceToHost);
-	cudaDeviceSynchronize();*/
-
-
-	// 3.
-	
-	
-	
-	//int n_coherent = calc_n_coherent(m_Fdmt.m_Fmin, m_Fdmt.m_Fmax, m_Fdmt.m_nchan/ m_len_sft, m_d_max, m_pulse_length);
-	
-	//cout << "n_coherent =  " << n_coherent << std::endl;
-	// !3
-	
-
-	cudaStatus = cudaGetLastError();
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
-		// Handle the error appropriately
-	}
-
-	
-
-	structOutDetection* pstructOutCur = 0;
-	checkCudaErrors(cudaMallocManaged((void**)&pstructOutCur, sizeof(structOutDetection)));
-	cudaDeviceSynchronize();
-	pstructOutCur->snr = 1. - FLT_MAX;
-	pstructOutCur->icol = -1;
-	pstructOutCur->irow = -1;
-	pstructOutCur->iwidth = -1;
-
-
-	cudaStatus = cudaGetLastError();
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
-		// Handle the error appropriately
-	}
-	//// 4. main loop
-	float coherent_d = -1.;
-	bool breturn = false;
-	//for (int iouter_d =31; iouter_d < 32; ++iouter_d)
-	for (int iouter_d = 0; iouter_d < m_ncoherent; ++iouter_d)
-	{
-		/*if (iouter_d < 30.0)
+		//int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
+		//std::vector<complex<float>> data4(lenarr4, 0);
+		//cufftComplex* pc = &pcmparrRawSignalRolled[lenarr4];
+		//cudaMemcpy(data4.data(), pcmparrRawSignalRolled, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+		//cudaDeviceSynchronize();
+		//std::array<long unsigned, 1> leshape2{ lenarr4 };
+		//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+		//int ii = 0;
+		
+		//3!
+		for (int idm = 0; idm < m_coh_dm_Vector.size(); ++idm)
 		{
-			continue;
-		}*/
-		double valcur_coherent_d = ((double)iouter_d) * ((double)m_d_max / ((double)m_ncoherent));
-		cout << "Chunk=  " << m_Chunk_id <<  "; iter= " << iouter_d << "; coherent_d = " << valcur_coherent_d << endl;
+			dim3 threadsPerBlock(1024, 1, 1);
+			dim3 blocksPerGrid((m_nchan * m_nbin + threadsPerBlock.x - 1) / threadsPerBlock.x, m_nfft, m_npol/2);
+			element_wise_cufftComplex_mult_kernel<<< blocksPerGrid, threadsPerBlock>>>
+				((cufftComplex*)pcmparrRawSignalCur, pcmparrRawSignalRolled, &m_pd_arr_dc[m_nchan * m_nbin * idm], m_npol/2,m_nfft, m_nchan * m_nbin);
 
-		/*std::vector<std::complex<float>> data(m_nbin * m_nchan * m_npol /2, 0);
-		cudaMemcpy(data.data(), pcmparrRawSignalCur, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
-		cudaMemcpyDeviceToHost);
-		cudaDeviceSynchronize();*/
-		
-		// fdmt input matrix computation
-		/*calcFDMT_Out_gpu(d_parr_fdmt_out, pcmparrRawSignalCur, pcarrCD_Out
-			, pcarrTemp, d_parr_fdmt_inp
-			, DISPERSION_CONSTANT * valcur_coherent_d
-			, pAuxBuff_fdmt, plan0, plan1, pcarrBuff);*/
-		// !
-		///*float* parr_fdmt_out = (float*)malloc(m_nbin * m_nchan* sizeof(float));
-		//cudaMemcpy(parr_fdmt_out, d_parr_fdmt_out, m_nbin * m_nchan * sizeof(float), cudaMemcpyDeviceToHost);
-		//float valmax = -0., valmin = 0.;
-		//unsigned int iargmax = -1, iargmin = -1;
-		//findMaxMinOfArray(parr_fdmt_out, m_nbin * m_nchan, &valmax, &valmin
-		//	, &iargmax, &iargmin);
-		//float* arrfdmt_norm = (float*)malloc(m_nbin * m_nchan * sizeof(float));
-		//cudaMemcpy(arrfdmt_norm, d_arrfdmt_norm, m_nbin * m_nchan * sizeof(float), cudaMemcpyDeviceToHost);
-		//float valmax1 = -0., valmin1 = 0.;
-		//unsigned int iargmax1 = -1, iargmin1 = -1;
-		//findMaxMinOfArray(arrfdmt_norm, m_nbin * m_nchan, &valmax1, &valmin1
-		//	, &iargmax1, &iargmin1);
-		//free(parr_fdmt_out);
-		//free(arrfdmt_norm);*/
 
-		fncCD_Multiband_gpu(pcarrCD_Out, pcmparrRawSignalCur
-			, DISPERSION_CONSTANT * valcur_coherent_d, plan0, pcarrTemp);
-
-		cudaStatus = cudaGetLastError();
-		if (cudaStatus != cudaSuccess) {
-			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
-			// Handle the error appropriately
-		}
-
-		auto start = std::chrono::high_resolution_clock::now();
-
-		/*std::vector<std::complex<float>> data0(m_nbin * m_nchan * m_npol / 2, 0);
-		cudaMemcpy(data0.data(), pcarrCD_Out, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
-			cudaMemcpyDeviceToHost);
-		cudaDeviceSynchronize();*/
-
-		cufftResult result = cufftExecC2C(plan1, pcarrCD_Out, pcarrTemp, CUFFT_FORWARD);
-		cudaDeviceSynchronize();
-
-		/*std::vector<std::complex<float>> data(m_nbin * m_nchan * m_npol / 2, 0);
-		cudaMemcpy(data.data(), pcarrTemp, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
-			cudaMemcpyDeviceToHost);
-		cudaDeviceSynchronize();*/
-
-		auto end = std::chrono::high_resolution_clock::now();
-		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-		iFFT_time += duration.count();
-		//
-		
-		calc_fdmt_inp(d_parr_fdmt_inp, pcarrTemp, (float*)pcarrCD_Out);
-		//
-		/*std::vector<float> data4(m_nbin * m_nchan * m_npol / 2, 0);
-		cudaMemcpy(data4.data(), d_parr_fdmt_inp, m_nbin * m_nchan * m_npol / 2 * sizeof(float),
-			cudaMemcpyDeviceToHost);
-		cudaDeviceSynchronize();*/
-		/*std::array<long unsigned, 2> leshape129{ m_len_sft * m_nchan, m_nbin / m_len_sft };
-		npy::SaveArrayAsNumpy("fdmt_inp.npy", false, leshape129.size(), leshape129.data(), data);*/
-
-		cudaStatus = cudaGetLastError();
-		if (cudaStatus != cudaSuccess) {
-			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
-			// Handle the error appropriately
-		}
-		start = std::chrono::high_resolution_clock::now();
-		
-		end = std::chrono::high_resolution_clock::now();
-		duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-		iFdmt_time += duration.count();
-
-		m_Fdmt.process_image(d_parr_fdmt_inp	, d_parr_fdmt_out, false);
-		/*std::vector<float> data5(m_Fdmt.m_imaxDt * m_Fdmt.m_cols, 0);
-		cudaMemcpy(data5.data(), d_parr_fdmt_out, m_Fdmt.m_imaxDt * m_Fdmt.m_cols * sizeof(float),
-			cudaMemcpyDeviceToHost);*/
-		cudaStatus = cudaGetLastError();
-		if (cudaStatus != cudaSuccess)
-		{
-			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
-			// Handle the error appropriately
-		}
-		
-		//
-		const int Rows = m_Fdmt.m_imaxDt;
-		const int Cols = m_Fdmt.m_cols;
-		const dim3 Totalsize(1024, 1, 1);
-		const dim3 gridSize((Cols + Totalsize.x - 1) / Totalsize.x, Rows, 1);
-		
-		float* d_pAuxArray = (float*)d_parr_fdmt_inp;
-		int* d_pAuxNumArray = (int*)(d_pAuxArray + gridSize.x * gridSize.y);
-		int* d_pWidthArray = d_pAuxNumArray + gridSize.x * gridSize.y;
-		/*float* d_pAuxArray    = (float*)pcarrTemp;
-		int*   d_pAuxNumArray = (int*)pcarrCD_Out;
-		int*   d_pWidthArray  = (int*)pcarrBuff;*/
-		detect_signal_gpu(d_parr_fdmt_out, d_arrfdmt_norm, Rows
-			, Cols, m_length_sum_wnd, gridSize, Totalsize
-			, d_pAuxArray, d_pAuxNumArray, d_pWidthArray, pstructOutCur);
-		cudaDeviceSynchronize();
-
-		cudaStatus = cudaGetLastError();
-		if (cudaStatus != cudaSuccess)
-		{
-			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
-			// Handle the error appropriately
-		}
-		if ((*pstructOutCur).snr >= m_sigma_bound)
-		{
-
-			COutChunkHeader head(Rows
-				, Cols
-				, (*pstructOutCur).irow
-				, (*pstructOutCur).icol
-				, (*pstructOutCur).iwidth
-				, (*pstructOutCur).snr
-				, valcur_coherent_d
-				, m_Block_id
-				, m_Chunk_id
-			);
-			pvctSuccessHeaders->push_back(head);
-
-			std::cout << "SNR = " << (*pstructOutCur).snr << "ROW ARGMAX = " << (*pstructOutCur).irow << "COLUMN ARGMAX = " << (*pstructOutCur).icol << endl;
+			 int threads1 = 1024;
+			int blocks1 = (m_npol / 2 * m_nfft * m_nchan * m_nbin + threads1 - 1) / threads1;
 			
-			int frequency = 1500; // Frequency in hertz
-			int duration = 500;   // Duration in milliseconds
-			//emitSound(frequency, duration / 4);
-			//emitSound(frequency + 500, duration / 2);
-			d_pAuxArray = NULL;
-			d_pAuxNumArray = NULL;
+			divide_cufftComplex_array_kernel <<<blocks1, threads1>>>((cufftComplex*)pcmparrRawSignalCur, m_npol / 2* m_nfft * m_nchan * m_nbin,  ((float)m_nbin));
+		//	int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
+		//std::vector<complex<float>> data4(lenarr4, 0);
+		//cudaMemcpy(data4.data(), (cufftComplex*)pcmparrRawSignalCur, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+		//cudaDeviceSynchronize();
+		//std::array<long unsigned, 1> leshape2{ lenarr4 };
+		//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+		//int ii = 0;
+			cufftComplex* pcmparrRawSignalRolled1 = NULL;
+			cudaMalloc(&pcmparrRawSignalRolled1, m_nfft * m_nchan * m_npol / 2 * m_nbin * sizeof(cufftComplex));
+			int mbin = get_mbin();
+			dim3 threads(256, 1);
+			dim3 blocks((mbin + threads.x - 1) / threads.x, m_nfft * m_nchan * m_npol / 2 * m_len_sft);
+			roll_rows_and_normalize_kernel << < blocks, threads >> > (pcmparrRawSignalRolled1, (cufftComplex*)pcmparrRawSignalCur, m_nfft * m_nchan * m_npol / 2 *  m_len_sft, mbin, mbin);
 
-			d_pWidthArray = NULL;
+			//int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
+			//std::vector<complex<float>> data4(lenarr4, 0);
+			//cudaMemcpy(data4.data(), pcmparrRawSignalRolled1, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+			//cudaDeviceSynchronize();
+			//std::array<long unsigned, 1> leshape2{ lenarr4 };
+			//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+			//int ii = 0;
 
-			breturn = true;
+			checkCudaErrors(cufftExecC2C(m_fftPlanInverse, pcmparrRawSignalRolled1, pcmparrRawSignalRolled1, CUFFT_INVERSE));
+			//checkCudaErrors(cufftExecC2C(m_fftPlanInverse, (cufftComplex*)pcmparrRawSignalCur, (cufftComplex*)pcmparrRawSignalCur, CUFFT_INVERSE));
+			divide_cufftComplex_array_kernel << <blocks1, threads1 >> > (pcmparrRawSignalRolled1, m_npol / 2 * m_nfft * m_nchan * m_nbin, ((float)mbin));
+
+			int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
+			std::vector<complex<float>> data4(lenarr4, 0);
+			cudaMemcpy(data4.data(), pcmparrRawSignalRolled1, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+			cudaDeviceSynchronize();
+			std::array<long unsigned, 1> leshape2{ lenarr4 };
+			npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+			int ii = 0;
+
+			void* fbuf = NULL;
+			cudaMalloc(&fbuf, msamp * m_nchan * m_len_sft * m_npol / 2 * sizeof(cufftComplex));
+			
+
+			cudaFree(pcmparrRawSignalRolled1);
+			cudaFree(fbuf);
 		}
-		//
-		///*std::vector<float> data(LEnChunk, 0);
-		//cudaMemcpy(data.data(), parr_fdmt_out, LEnChunk * sizeof(float),
-		//	cudaMemcpyDeviceToHost);
-		//cudaDeviceSynchronize();*/
+		cudaFree(pcmparrRawSignalRolled);
+		return true;
 	}
-	cudaFree(pstructOutCur);
-	return breturn;
+//-----------------------------------------------------------------------------------
+//		
+//__global__	void  transpose_unpadd(cufftComplex* fbuf, cufftComplex* arin,int nfft,  int noverlap_per_channel
+//	, int mbin_adjusted, const int nchan, const int nlen_sft, const int mbin)
+//	{
+//		
+//
+//			for (int ibin = 0; ibin < mbin_adjusted; ++ibin)
+//			{
+//				int ibin_adjusted = ibin + noverlap_per_channel;
+//				for (int ilen_sft = 0; ilen_sft < nlen_sft; ++ilen_sft)
+//				{
+//					for (int ifft = 0; ifft < nfft; ++ifft)
+//					{
+//						int isamp = ibin + mbin_adjusted * ifft;
+//						int num = 0;
+//						for (int ichan = 0; ichan < nchan; ++ichan)
+//						{
+//							// Select bins from valid region and reverse the frequency axis					
+//							fbuf[isamp * nchan * nlen_sft + ichan * nlen_sft + nlen_sft - ilen_sft - 1][0] =
+//								arin[ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted][0];
+//							fbuf[isamp * nchan * nlen_sft + ichan * nlen_sft + nlen_sft - ilen_sft - 1][1] =
+//								arin[ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted][1];
+//							++num;
+//						}
+//					}
+//				}
+//			}
+//		
+//	}
+
+	//-----------------------------------------------------------------------
+	__global__ void  divide_cufftComplex_array_kernel(cufftComplex* d_arr, int len, float val)
+	{
+		int idx = blockIdx.x * blockDim.x + threadIdx.x;
+		if (idx >= len)
+		{
+			return;
+		}
+		d_arr[idx].x /= val;
+		d_arr[idx].y /= val;
+	}
+//-------------------------------------------------------------------------------------------------
+	//---------------------------------------------------------------
+	__global__
+		void scaling_kernel(cufftComplex* data, long long element_count, float scale)
+	{
+		const int tid = threadIdx.x;
+		const int stride = blockDim.x;
+		for (long long i = tid; i < element_count; i += stride)
+		{
+			data[i].x *= scale;
+			data[i].y *= scale;
+		}
+	}
+__global__ void  element_wise_cufftComplex_mult_kernel(cufftComplex * d_arrOut, cufftComplex * d_arrInp0, cufftComplex * d_arrInp1
+	, int npol, int nfft, int dim2)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx >= dim2)
+	{
+		return;
+	}
+	//printf("ff\n");
+	int ipol = blockIdx.z;
+	int ifft = blockIdx.y;
+	int ibegin = ipol * nfft * dim2 + ifft * dim2;
+	d_arrOut[ibegin + idx].x = d_arrInp0[ibegin + idx].x* d_arrInp1[idx].x - d_arrInp0[ibegin + idx].y * d_arrInp1[idx].y;
+	d_arrOut[ibegin + idx].y = d_arrInp0[ibegin + idx].x* d_arrInp1[idx].y + d_arrInp0[ibegin + idx].y * d_arrInp1[idx].x;
+	//printf("%f  %f\n", d_arrOut[ibegin + idx].x, d_arrOut[ibegin + idx].y);
+	
 }
+	
+	//--------------------------------------------------------------------------------
+
+	__global__ void roll_rows_and_normalize_kernel(cufftComplex* arr_rez, cufftComplex* arr, int rows, int cols, int shift)
+	{
+
+		int idx0 = blockIdx.x * blockDim.x + threadIdx.x;
+		if (idx0 >= cols)
+		{
+			return;
+		}
+		int ind_new = blockIdx.y * cols + (idx0 + shift) % cols;
+		int ind = blockIdx.y * cols + idx0;
+		arr_rez[ind_new].x = arr[ind].x /*/cols*/;
+		arr_rez[ind_new].y = arr[ind].y/*/cols*/ ;
+
+	}
+
 //-----------------------------------------------------------------
 
 long long CChunk_gpu::calcLenChunk_(CTelescopeHeader header, const int nsft
@@ -654,7 +663,7 @@ long long CChunk_gpu::calcLenChunk_(CTelescopeHeader header, const int nsft
 //		//for (int iouter_d = 31; iouter_d < 32; ++iouter_d)
 //	{
 //
-//		double valcur_coherent_d = ((double)iouter_d) * ((double)m_d_max / ((double)n_coherent));
+//		 float valcur_coherent_d = ((float)iouter_d) * ((float)m_d_max / ((float)n_coherent));
 //		cout << "Chunk=  " << m_Chunk_id << "; chunk= " << iouter_d << "; iter= " << iouter_d << "; coherent_d = " << valcur_coherent_d << endl;
 //
 //		/*std::vector<std::complex<float>> data(m_nbin * m_nchan * m_npol /2, 0);
@@ -940,97 +949,9 @@ float fnc_norm2(cufftComplex* pc)
 	return ((*pc).x * (*pc).x + (*pc).y * (*pc).y);
 }
 
-//-------------------------------------------------------------------
-void CChunk_gpu::fncCD_Multiband_gpu(cufftComplex* pcarrCD_Out, cufftComplex* pcarrffted_rowsignal
-	, const  double VAl_practicalD, cufftHandle  plan, cufftComplex* pAuxBuff)
-{	
-	 const dim3 Totalsize = dim3(1024, 1, 1);
-	 const dim3 gridSize = dim3((m_nbin + Totalsize.x - 1) / Totalsize.x,  m_nchan,1);	
-	 kernel_ElementWiseMult << < gridSize, Totalsize >> >
-		 (pAuxBuff,pcarrffted_rowsignal, m_nbin, m_npol/2, VAl_practicalD, m_Fmin
-		 	, m_Fmax);
-	 
-	 cudaDeviceSynchronize();
 
-	/*std::vector<std::complex<float>> data(m_nbin * m_nchan * m_npol / 2, 0);
-	cudaMemcpy(data.data(), pAuxBuff, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
-		cudaMemcpyDeviceToHost);
-	cudaDeviceSynchronize();*/
 
-	auto start = std::chrono::high_resolution_clock::now();
-	checkCudaErrors(cufftExecC2C(plan, pAuxBuff, pcarrCD_Out, CUFFT_INVERSE));
 
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	iFFT_time += duration.count();
-
-	/*std::vector<std::complex<float>> data1(m_nbin * m_nchan * m_npol / 2, 0);
-	cudaMemcpy(data1.data(), pcarrCD_Out, m_nbin * m_nchan * m_npol / 2 * sizeof(std::complex<float>),
-		cudaMemcpyDeviceToHost);
-	cudaDeviceSynchronize();*/
-	
-	scaling_kernel << <1, 1024, 0 >> > (pcarrCD_Out, m_nbin * m_npol* m_nchan/2, 1.f / ((float)m_nbin));
-	cudaDeviceSynchronize();
-}
-
-//-------------------------------------------------------------
- // calculation:
- // H = np.e**(-(2*np.pi*complex(0,1) * practicalD /(f_min + f) + 2*np.pi*complex(0,1) * practicalD*f /(f_max**2)))
- // np.fft.fft(raw_signal) * H 
-// gridDim.z - num channels
-// gridDim.y - num polarizations in physical sense
-__global__ void kernel_ElementWiseMult(cufftComplex* pAuxBuff, cufftComplex* pcarrffted_rowsignal
-	, const unsigned int LEnChunk, const unsigned int n_pol_phys
-	, const  double VAl_practicalD, const double Fmin
-	, const double Fmax)
-{
-	__shared__ double arrf[2];
-
-	double chanBW = (Fmax - Fmin) / gridDim.y;
-	arrf[0] = Fmin + chanBW * blockIdx.y;
-	arrf[1] = arrf[0] + chanBW;	
-
-	const int j = blockIdx.x * blockDim.x + threadIdx.x;
-	if (j >= LEnChunk)
-	{
-		return;
-	}
-	double step = (arrf[1] - arrf[0]) / ((double)LEnChunk);
-	//double t = VAl_practicalD * (1. / (arrf[0] + step * (double)j) + 1. / (arrf[1]) * (step * (double)j / arrf[1]));
-	double t = VAl_practicalD * (1. / (arrf[0] + step * (double)j) + 1. / (arrf[1]) * (step * (double)j / arrf[1]))
-		+ (VAl_practicalD / arrf[0] + VAl_practicalD * (arrf[0] - Fmin) / (Fmax * Fmax));
-	/*double step = (Fmax - Fmin) / ((double)LEnChunk);
-	double t = VAl_practicalD * (1. / (Fmin + step * (double)j) + 1. / (Fmax) * (step * (double)j / Fmax));	*/
-
-	double val_prD_int = 0, val_prD_frac = 0;
-	double t4 = -modf(t, &val_prD_int) * 2.0;
-
-	double val_x = 0.;
-	double val_y = 0.;
-	sincospi(t4, &val_y, &val_x);
-	unsigned int nelem0 = LEnChunk * blockIdx.y * n_pol_phys + j;
-	pAuxBuff[nelem0].x = (float)(val_x * pcarrffted_rowsignal[nelem0].x - val_y * pcarrffted_rowsignal[nelem0].y); // Real part
-	pAuxBuff[nelem0].y = (float)(val_x * pcarrffted_rowsignal[nelem0].y + val_y * pcarrffted_rowsignal[nelem0].x); // Imaginary part
-	if (n_pol_phys == 2)
-	{
-		nelem0 += LEnChunk;
-		pAuxBuff[nelem0].x = (float)(val_x * pcarrffted_rowsignal[nelem0].x - val_y * pcarrffted_rowsignal[nelem0].y); // Real part
-		pAuxBuff[nelem0].y = (float)(val_x * pcarrffted_rowsignal[nelem0].y + val_y * pcarrffted_rowsignal[nelem0].x); // Imaginary par
-	}
-}
-
-//---------------------------------------------------------------
-__global__
-void scaling_kernel(cufftComplex* data, long long element_count, float scale)
-{
-	const int tid = threadIdx.x;
-	const int stride = blockDim.x;
-	for (long long i = tid; i < element_count; i += stride)
-	{
-		data[i].x *= scale;
-		data[i].y *= scale;
-	}
-}
 //----------------------------------------------------
 
 __global__

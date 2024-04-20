@@ -3,7 +3,7 @@
 #include <vector>
 #include <cufft.h>
 #include "Constants.h"
-//#include "FdmtU.cuh"
+#include <complex> 
 #include "FdmtGpu.cuh"
 #include "ChunkB.h"
 #define TILE_DIM 32
@@ -25,61 +25,37 @@ public:
 		const float Fmin
 		, const float Fmax
 		, const int npol
-		, const int nchan		
+		, const int nchan
 		, const unsigned int len_sft
 		, const int Block_id
 		, const int Chunk_id
-		, const double d_max
-		, const double d_min
+		, const  float d_max
+		, const  float d_min
 		, const int ncoherent
 		, const float sigma_bound
 		, const int length_sum_wnd
 		, const int nbin
 		, const int nfft
 		, const int noverlap
-		, const float tsamp
-	);
+		, const float tsamp);
 	//---------------------------------------------------------------------------------------
-	float* m_pd_arrcoh_dm;
-	float* m_pd_arrdc;
+	double* m_pd_arrcoh_dm;
+
+	cufftComplex* m_pd_arr_dc;
+
+	cufftHandle m_fftPlanForward;
+
+	cufftHandle m_fftPlanInverse;
+
+	CFdmtGpu m_Fdmt;
+	
 
 	//-------------------------------------------------------------------------
 	virtual bool process(void* pcmparrRawSignalCur
-		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg);
-
-	virtual bool try0();
-
-	CFdmtGpu m_Fdmt;
-//-------------------------------------------------------------------------
-	bool fncChunkProcessing_gpu(cufftComplex* pcmparrRawSignalCur
-		, void* pAuxBuff_fdmt		
-		, cufftComplex* pcarrTemp
-		, cufftComplex* pcarrCD_Out
-		, cufftComplex* pcarrBuff
-		, char* pAuxBuff_flt, fdmt_type_* d_arrfdmt_norm
-		, cufftHandle plan0, cufftHandle plan1		
-		, std::vector<COutChunkHeader>* pvctSuccessHeaders);
-
-	
-
-	void fncCD_Multiband_gpu(cufftComplex* pcarrCD_Out, cufftComplex* pcarrffted_rowsignal
-		, const  double VAl_practicalD, cufftHandle  plan, cufftComplex* pAuxBuff);
+		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg);	
 
 	void calc_fdmt_inp(fdmt_type_* d_parr_fdmt_inp, cufftComplex* pcarrTemp
-		, float* pAuxBuff);	
-
-	bool detailedChunkProcessing(
-		const COutChunkHeader outChunkHeader
-		, cufftHandle plan0
-		, cufftHandle plan1
-		, cufftComplex* pcmparrRawSignalCur
-		, fdmt_type_* d_arrfdmt_norm
-		, void* pAuxBuff_fdmt
-		, cufftComplex* pcarrTemp
-		, cufftComplex* pcarrCD_Out
-		, cufftComplex* pcarrBuff
-		, char* pInpOutBuffFdmt
-		, CFragment* pFRg);
+		, float* pAuxBuff);		
 
 	static long long calcLenChunk_(CTelescopeHeader header, const int nsft
 		, const float pulse_length, const float d_max);
@@ -98,10 +74,32 @@ public:
 		, void** ppAuxBuff_fdmt, fdmt_type_** d_parrfdmt_norm, cufftComplex** ppcarrTemp, cufftComplex** ppcarrCD_Out
 		, cufftComplex** ppcarrBuff, char** ppInpOutBuffFdmt,  CChunk_gpu** ppChunk);
 
+	void compute_chirp_channel();
+
+	void create_fft_plans();
+
 };
 __global__
-void kernel_compute_chirp_channel(float* m_pd_arrdc, float* m_pd_arrcoh_dm, const float Fmin, const float Fmax, const int nbin, const int len_sft, const int mbin);
+void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double bw_chan, double  Fmin, double bw_sub);
 
+__global__
+void kernel_create_arr_bin_freqs_and_taper(double* d_parr_bin_freqs, double* d_parr_taper, double  bw_chan, int mbin);
+
+__global__
+void kernel_create_arr_dc(cufftComplex* parr_dc, double* parrcoh_dm, double* parr_freqs_chan, double* parr_bin_freqs, double* parr_taper
+	, int ndm, int nchan, int len_sft, int mbin);
+
+__global__ 
+void roll_rows_and_normalize_kernel(cufftComplex* arr_rez, cufftComplex* arr, int rows, int cols, int shift);
+
+__global__ 
+void  element_wise_cufftComplex_mult_kernel(cufftComplex* d_arrOut, cufftComplex* d_arrInp0, cufftComplex* d_arrInp1
+	, int npol, int nfft, int dim2);
+
+__global__
+void element_wise_cufftComplex_mult_kernel(cufftComplex* data, long long element_count, float scale);
+
+__global__ void  divide_cufftComplex_array_kernel(cufftComplex* d_arr, int len, float val);
 
 __global__
 void scaling_kernel(cufftComplex* data, long long element_count, float scale);
@@ -139,11 +137,6 @@ void fdmt_normalization(fdmt_type_* d_arr, fdmt_type_* d_norm, const int lenChun
 
 __global__
 void multiTransp_kernel(float* output, const int height, const int width, float* input);
-
-__global__ void kernel_ElementWiseMult(cufftComplex* pAuxBuff, cufftComplex* pcarrffted_rowsignal
-	, const unsigned int LEnChunk, const unsigned int n_pol_phys
-	, const  double VAl_practicalD, const double Fmin
-	, const double Fmax);
 
 
 
