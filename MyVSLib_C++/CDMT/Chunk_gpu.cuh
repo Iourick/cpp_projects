@@ -102,8 +102,16 @@ void element_wise_cufftComplex_mult_kernel(cufftComplex* data, long long element
 __global__ void  divide_cufftComplex_array_kernel(cufftComplex* d_arr, int len, float val);
 
 __global__
+void calc_intensity_kernel(float *intensity, const int len, const int npol, cufftComplex* fbuf);
+
+__global__
 void  transpose_unpadd(cufftComplex* fbuf, cufftComplex* arin, int nfft, int noverlap_per_channel
 	, int mbin_adjusted, const int nchan, const int nlen_sft, int mbin);
+
+__global__ void transpose(float* odata, float* idata, int width, int height);
+
+__global__
+void dedisperse(float* parr_wfall_disp, float* parrIntesity, double dm, double fmin, double fmax, double   val_tsamp_wfall, double foff, int cols);
 
 __global__
 void scaling_kernel(cufftComplex* data, long long element_count, float scale);

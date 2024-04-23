@@ -1,7 +1,7 @@
 #pragma once
 #include <cmath>
 #include "FdmtB.h"
-
+#include "FdmtCpu.h"
 #include "Constants.h"
 class CFdmtCpu:public CFdmtB
 {

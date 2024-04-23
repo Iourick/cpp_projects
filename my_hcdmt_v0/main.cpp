@@ -37,7 +37,7 @@ using namespace std;
 char PathInpFile[] = "D://BASSA//hdf5_data//L2012176_SAP000_B000_S0_P001_bf.h5";
 char PathOutFold[] = "OutPutFold";
 TYPE_OF_INP_FORMAT INP_FORMAT = FLOFAR;
-TYPE_OF_PROCESSOR PROCESSOR = GPU;
+TYPE_OF_PROCESSOR PROCESSOR = CPU;
 
 char* pPathInpFile = PathInpFile;
 char* pPathOutFold = PathOutFold;

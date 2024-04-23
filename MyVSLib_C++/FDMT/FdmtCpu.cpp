@@ -73,10 +73,22 @@ void CFdmtCpu::process_image(fdmt_type_* piarrImgInp, fdmt_type_* piarrImgOut, c
 	// !1
 
 	// 2. allocate memory 
-	piarrOut_0 = (fdmt_type_*)calloc((m_pparrRowsCumSum[0])[m_parrQuantMtrx[0]] * m_cols, sizeof(fdmt_type_));
-	piarrOut_1 = (fdmt_type_*)calloc((m_pparrRowsCumSum[1])[m_parrQuantMtrx[1]] * m_cols, sizeof(fdmt_type_));
-	// !2
+	if (!(piarrOut_0 = (fdmt_type_*)calloc(m_pparrRowsCumSum[0][m_parrQuantMtrx[0]] * m_cols, sizeof(fdmt_type_))))
+	{
+		printf("Can't allocate memory  for piarrOut_0 in  CFdmtCpu::process_image(..)");
+		return;
+	}
 
+	if (!(piarrOut_1 = (fdmt_type_*)calloc((m_pparrRowsCumSum[1])[m_parrQuantMtrx[1]] * m_cols, sizeof(fdmt_type_))))
+	{
+		printf("Can't allocate memory  for piarrOut_1 in  CFdmtCpu::process_image(..)");
+		free(piarrOut_0);
+		return;
+	}
+
+	
+	// !2
+	
    // 3. call initialization func
 	const int ideltaT = calc_deltaT(m_Fmin, m_Fmin + (m_Fmax - m_Fmin) / m_nchan);
 	fnc_initC(piarrImgInp, ideltaT, piarrOut_0, b_ones);

@@ -65,15 +65,15 @@ CFdmtB::CFdmtB(const  CFdmtB& R) :CFdmtB()
 
 	m_pparrFreq = (float**)malloc((R.m_iNumIter + 1) * sizeof(float*));
 	for (int i = 0; i < (R.m_iNumIter + 1); ++i) {
-	m_pparrFreq[i] = (float*)malloc(R.m_parrQuantMtrx[i] * sizeof(float));
-	memcpy(m_pparrFreq[i], R.m_pparrFreq[i], R.m_parrQuantMtrx[i] * sizeof(float));
+	m_pparrFreq[i] = (float*)malloc((1 + R.m_parrQuantMtrx[i]) * sizeof(float));
+	memcpy(m_pparrFreq[i], R.m_pparrFreq[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(float));
 	}
 
 	m_pparrRowsCumSum = (int**)malloc((R.m_iNumIter + 1) * sizeof(int*));
 	for (int i = 0; i < (R.m_iNumIter + 1); ++i)
 	{
-		m_pparrRowsCumSum[i] = (int*)malloc(R.m_parrQuantMtrx[i] * sizeof(int));
-		memcpy(m_pparrRowsCumSum[i], R.m_pparrRowsCumSum[i], R.m_parrQuantMtrx[i] * sizeof(int));
+		m_pparrRowsCumSum[i] = (int*)malloc((1 + R.m_parrQuantMtrx[i]) * sizeof(int));
+		memcpy(m_pparrRowsCumSum[i], R.m_pparrRowsCumSum[i], (1 + R.m_parrQuantMtrx[i]) *  sizeof(int));
 	}
 }
 //-------------------------------------------------------------------
@@ -90,27 +90,44 @@ CFdmtB& CFdmtB::operator=(const CFdmtB& R)
 	m_imaxDt = R.m_imaxDt;
 	m_iNumIter = R.m_iNumIter;
 
-	for (int i = 0; i < m_iNumIter; ++i)
+	if (m_pparrFreq !=NULL)
 	{
-		free(m_pparrFreq[i]);
-		free(m_pparrRowsCumSum[i]);
+		for (int i = 0; i < m_iNumIter; ++i)
+		{
+			free(m_pparrFreq[i]);
+			free(m_pparrRowsCumSum[i]);
+		}
+		free(m_pparrFreq);
 	}
-	free(m_pparrFreq);
-	free(m_pparrRowsCumSum);
+	if (m_pparrRowsCumSum != NULL)
+	{
+		free(m_pparrRowsCumSum);
+	}
+	
 	m_pparrFreq = (float**)malloc((R.m_iNumIter + 1) * sizeof(float*));
 	for (int i = 0; i < (R.m_iNumIter + 1); ++i) {
-	m_pparrFreq[i] = (float*)malloc(R.m_parrQuantMtrx[i] * sizeof(float));
-	memcpy(m_pparrFreq[i], R.m_pparrFreq[i], R.m_parrQuantMtrx[i] * sizeof(float));
+		m_pparrFreq[i] = (float*)malloc((1 + R.m_parrQuantMtrx[i])* sizeof(float));
+	memcpy(m_pparrFreq[i], R.m_pparrFreq[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(float));
 	}
+
+	/*for (int i = 0; i < (*piNumIter + 1); ++i)
+	{
+		pparrFreq[i] = (float*)malloc((iarrQuantMtrx[i] + 1) * sizeof(float));
+		pparrRowsCumSum[i] = (int*)malloc((iarrQuantMtrx[i] + 1) * sizeof(int));
+	}*/
+
 
 	m_pparrRowsCumSum = (int**)malloc((R.m_iNumIter + 1) * sizeof(int*));
 	for (int i = 0; i < (R.m_iNumIter + 1); ++i)
 	{
-		m_pparrRowsCumSum[i] = (int*)malloc(R.m_parrQuantMtrx[i] * sizeof(int));
-		memcpy(m_pparrRowsCumSum[i], R.m_pparrRowsCumSum[i], R.m_parrQuantMtrx[i] * sizeof(int));
+		m_pparrRowsCumSum[i] = (int*)malloc((1 + R.m_parrQuantMtrx[i]) * sizeof(int));
+		memcpy(m_pparrRowsCumSum[i], R.m_pparrRowsCumSum[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(int));
 	}
 
-	free(m_parrQuantMtrx);
+	if (m_parrQuantMtrx != NULL)
+	{
+		free(m_parrQuantMtrx);
+	}	
 	m_parrQuantMtrx = (int*)malloc((R.m_iNumIter + 1) * sizeof(int));
 
 	memcpy(m_parrQuantMtrx, R.m_parrQuantMtrx, (R.m_iNumIter + 1) * sizeof(int));
@@ -151,7 +168,7 @@ void  CFdmtB::create_config(int**& pparrRowsCumSum, float**& pparrFreq, int** pp
 	// 2. memory allocation for 2 auxillary arrays
 	int* iarrQuantMtrx = *pparrQuantMtrx;
 
-	pparrFreq = (float**)malloc((*piNumIter + 1) * sizeof(float*)); // Allocate memory for m pointers to int
+	pparrFreq = (float**)malloc((*piNumIter + 1) * sizeof(float*)); //
 
 	pparrRowsCumSum = (int**)malloc((*piNumIter + 1) * sizeof(int*));
 

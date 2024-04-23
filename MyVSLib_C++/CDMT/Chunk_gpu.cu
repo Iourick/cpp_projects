@@ -74,7 +74,7 @@
 	long long  iNormalize_time = 0;
 	// total time
 	long long  iTotal_time = 0;
-
+    #define BLOCK_DIM 32//16
 	CChunk_gpu::~CChunk_gpu()
 	{
 		if (m_pd_arrcoh_dm)
@@ -407,6 +407,9 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 		//int ii = 0;
 		
 		//3!
+	
+		float* poutImg = NULL;
+		cudaMalloc(&poutImg, msamp * m_len_sft * m_coh_dm_Vector.size() *sizeof(float));
 		for (int idm = 0; idm < m_coh_dm_Vector.size(); ++idm)
 		{
 			dim3 threadsPerBlock(1024, 1, 1);
@@ -419,35 +422,32 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 			int blocks1 = (m_npol / 2 * m_nfft * m_nchan * m_nbin + threads1 - 1) / threads1;
 			
 			divide_cufftComplex_array_kernel <<<blocks1, threads1>>>((cufftComplex*)pcmparrRawSignalCur, m_npol / 2* m_nfft * m_nchan * m_nbin,  ((float)m_nbin));
-		//	int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
-		//std::vector<complex<float>> data4(lenarr4, 0);
-		//cudaMemcpy(data4.data(), (cufftComplex*)pcmparrRawSignalCur, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
-		//cudaDeviceSynchronize();
-		//std::array<long unsigned, 1> leshape2{ lenarr4 };
-		//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
-		//int ii = 0;
+			
+		/*	int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;
+		std::vector<complex<float>> data4(lenarr4, 0);
+		cudaMemcpy(data4.data(), &((cufftComplex*)pcmparrRawSignalCur)[lenarr4], lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+		cudaDeviceSynchronize();
+		std::array<long unsigned, 1> leshape2{ lenarr4 };
+		npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+		int ii = 0;*/
+
 			cufftComplex* pcmparrRawSignalRolled1 = NULL;
 			cudaMalloc(&pcmparrRawSignalRolled1, m_nfft * m_nchan * m_npol / 2 * m_nbin * sizeof(cufftComplex));
 			int mbin = get_mbin();
 			dim3 threads(256, 1);
 			dim3 blocks((mbin + threads.x - 1) / threads.x, m_nfft * m_nchan * m_npol / 2 * m_len_sft);
-			roll_rows_and_normalize_kernel << < blocks, threads >> > (pcmparrRawSignalRolled1, (cufftComplex*)pcmparrRawSignalCur, m_nfft * m_nchan * m_npol / 2 *  m_len_sft, mbin, mbin);
-
-			//int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
-			//std::vector<complex<float>> data4(lenarr4, 0);
-			//cudaMemcpy(data4.data(), pcmparrRawSignalRolled1, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
-			//cudaDeviceSynchronize();
-			//std::array<long unsigned, 1> leshape2{ lenarr4 };
-			//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
-			//int ii = 0;
+			roll_rows_and_normalize_kernel << < blocks, threads >> > (pcmparrRawSignalRolled1, (cufftComplex*)pcmparrRawSignalCur, m_nfft * m_nchan * m_npol / 2 *  m_len_sft, mbin, mbin/2);
+			cudaDeviceSynchronize();
+			/*int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;
+			std::vector<complex<float>> data4(lenarr4, 0);
+			cudaMemcpy(data4.data(), pcmparrRawSignalRolled1, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+			cudaDeviceSynchronize();
+			std::array<long unsigned, 1> leshape2{ lenarr4 };
+			npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+			int ii = 0;*/
 
 			checkCudaErrors(cufftExecC2C(m_fftPlanInverse, pcmparrRawSignalRolled1, pcmparrRawSignalRolled1, CUFFT_INVERSE));
 			//checkCudaErrors(cufftExecC2C(m_fftPlanInverse, (cufftComplex*)pcmparrRawSignalCur, (cufftComplex*)pcmparrRawSignalCur, CUFFT_INVERSE));
-			
-			
-			blocks1 = (m_nfft * m_nchan * m_npol / 2 * m_nbin + threads1 - 1) / threads1;
-			divide_cufftComplex_array_kernel << <blocks1, threads1 >> > (pcmparrRawSignalRolled1, m_nfft * m_nchan * m_npol / 2 * m_nbin, ((float)mbin));
-
 			//int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
 			//std::vector<complex<float>> data4(lenarr4, 0);
 			//cudaMemcpy(data4.data(), pcmparrRawSignalRolled1, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
@@ -455,7 +455,18 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 			//std::array<long unsigned, 1> leshape2{ lenarr4 };
 			//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
 			//int ii = 0;
-
+			
+			blocks1 = (m_nfft * m_nchan * m_npol / 2 * m_nbin + threads1 - 1) / threads1;
+			divide_cufftComplex_array_kernel << <blocks1, threads1 >> > (pcmparrRawSignalRolled1, m_nfft * m_nchan * m_npol / 2 * m_nbin, ((float)mbin));
+			cudaDeviceSynchronize();
+			//int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
+			//std::vector<complex<float>> data4(lenarr4, 0);
+			//cudaMemcpy(data4.data(), &pcmparrRawSignalRolled1[lenarr4], lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+			//cudaDeviceSynchronize();
+			//std::array<long unsigned, 1> leshape2{ lenarr4 };
+			//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+			//int ii = 0;
+			// OK
 
 			int noverlap_per_channel = get_noverlap_per_channel();
 			int mbin_adjusted = get_mbin_adjusted();
@@ -469,21 +480,240 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 				((cufftComplex*)fbuf, pcmparrRawSignalRolled1, m_nfft, noverlap_per_channel
 				, mbin_adjusted, m_nchan, m_len_sft, mbin);
 
-			int lenarr4 = m_nfft * mbin_adjusted * m_nchan * m_len_sft * m_npol / 2 / 2;// *sizeof(cufftComplex));
-			std::vector<complex<float>> data4(lenarr4, 0);
-			cudaMemcpy(data4.data(), fbuf, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+			//int lenarr4 = m_nfft * mbin_adjusted * m_nchan * m_len_sft * m_npol / 2 / 2;// *sizeof(cufftComplex));
+			//std::vector<complex<float>> data4(lenarr4, 0);
+			//cudaMemcpy(data4.data(), (cufftComplex*)fbuf, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+			//cudaDeviceSynchronize();
+			//std::array<long unsigned, 1> leshape2{ lenarr4 };
+			//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+			//int ii = 0;
+			//// OK
+			// 
+			// 
+			//float* intensity = (float*)pcmparrRawSignalRolled1;
+			//dim3 threads2(1024, 1, 1);
+			//dim3 blocks2((msamp * m_nchan * m_len_sft + threads.x - 1) / threads.x, 1, 1);
+
+			//calc_intensity_kernel << <  blocks2, threads2>> > (intensity, msamp* m_nchan * m_len_sft, m_npol, (cufftComplex*)fbuf);
+			//cudaDeviceSynchronize();
+			///*int lenarr4 = msamp * m_nchan * m_len_sft;
+			//std::vector<float> data4(lenarr4, 0);
+			//cudaMemcpy(data4.data(), intensity, lenarr4 * sizeof(float), cudaMemcpyDeviceToHost);
+			//cudaDeviceSynchronize();
+			//std::array<long unsigned, 1> leshape2{ lenarr4 };
+			//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+			//int ii = 0;*/
+
+			//dim3 grid((m_nchan * m_len_sft + BLOCK_DIM - 1) / BLOCK_DIM, (msamp + BLOCK_DIM - 1) / BLOCK_DIM, 1);
+   //         dim3 threads__(BLOCK_DIM, BLOCK_DIM, 1);
+			//transpose<<< grid, threads__>>>(intensity + m_nchan * m_len_sft * msamp, intensity, m_nchan * m_len_sft, msamp);
+			//int lenarr4 = msamp * m_nchan * m_len_sft;
+			//std::vector<float> data4(lenarr4, 0);
+			//cudaMemcpy(data4.data(), intensity + m_nchan * m_len_sft * msamp,  lenarr4 * sizeof(float), cudaMemcpyDeviceToHost);
+			//cudaDeviceSynchronize();
+			//std::array<long unsigned, 1> leshape2{ lenarr4 };
+			//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+			//int ii = 0;
+
+
+
+			float* parr_wfall = (float*)pcmparrRawSignalRolled1;
+			
+			
+			// here is bug:
+			dim3 threadsPerChunk(TILE_DIM, TILE_DIM, 1);
+			dim3 chunkPerGrid((m_nchan* m_len_sft + TILE_DIM - 1) / TILE_DIM, ( msamp + TILE_DIM - 1) / TILE_DIM, 1);
+			
+			calcPowerMtrx_kernel << <  chunkPerGrid, threadsPerChunk >> > (parr_wfall, msamp, m_nchan * m_len_sft, m_npol, (cufftComplex*)fbuf);
+			
+			cudaDeviceSynchronize();
+
+			/*int lenarr4 = msamp * m_nchan * m_len_sft;
+			std::vector<float> data4(lenarr4, 0);
+			cudaMemcpy(data4.data(), parr_wfall, lenarr4 * sizeof(float), cudaMemcpyDeviceToHost);
+			cudaDeviceSynchronize();
+			std::array<long unsigned, 1> leshape2{ lenarr4 };
+			npy::SaveArrayAsNumpy("parr_wfall_gpu.npy", false, leshape2.size(), leshape2.data(), data4);
+			int ii = 0;*/
+
+
+			float* parr_wfall_disp = (float* )pcmparrRawSignalCur;
+			double val_tsamp_wfall = m_len_sft * m_tsamp;
+			double val_dm = m_coh_dm_Vector[idm];
+			double f0 = ((double)m_Fmax - (double)m_Fmin) / (m_nchan * m_len_sft);
+			dim3 threadsPerblock1 (1024,1,1);
+			dim3 blocksPerGrid1  ((msamp + threadsPerblock1.x - 1) / threadsPerblock1.x, m_nchan * m_len_sft, 1);
+			dedisperse << <  blocksPerGrid1, threadsPerblock1 >> > (parr_wfall_disp, parr_wfall, val_dm
+				, (double)m_Fmin, (double)m_Fmax,  val_tsamp_wfall, f0, msamp);
+			cudaDeviceSynchronize();
+
+			/*int lenarr4 = msamp * m_nchan * m_len_sft;
+			std::vector<float> data4(lenarr4, 0);
+			cudaMemcpy(data4.data(), parr_wfall_disp, lenarr4 * sizeof(float), cudaMemcpyDeviceToHost);
 			cudaDeviceSynchronize();
 			std::array<long unsigned, 1> leshape2{ lenarr4 };
 			npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
-			int ii = 0;
+			int ii = 0;*/
+			
 
+			CFdmtGpu fdmt(
+				m_Fmin
+				, m_Fmax
+				, m_nchan* m_len_sft // quant channels/rows of input image
+				, msamp
+				, m_len_sft
+			);
+			
+			fdmt.process_image(parr_wfall_disp, &poutImg[idm * msamp * m_len_sft], false);
+			//cudaFree(parrIntesity);
 			cudaFree(pcmparrRawSignalRolled1);
 			cudaFree(fbuf);
+
+		}
+
+		std::vector<std::vector<float>>* pvecImg_temp = nullptr;
+		if (nullptr != pvecImg)
+		{
+			pvecImg->resize(m_coh_dm_Vector.size());
+			for (auto& row : *pvecImg)
+			{
+				row.resize(msamp * m_len_sft);
+			}
+			pvecImg_temp = pvecImg;
+		}
+		else
+		{
+			pvecImg_temp = new std::vector<std::vector<float>>;
+			pvecImg_temp->resize(m_coh_dm_Vector.size());
+			for (auto& row : *pvecImg_temp)
+			{
+				row.resize(msamp * m_len_sft);
+			}
+		}
+		for (int i = 0; i < m_coh_dm_Vector.size(); ++i)
+		{
+			cudaMemcpy(pvecImg_temp->at(i).data(), &poutImg[i * msamp * m_len_sft], msamp* m_len_sft * sizeof(float), cudaMemcpyDeviceToHost);
 		}
 		cudaFree(pcmparrRawSignalRolled);
+		cudaFree(poutImg);
 		return true;
 	}
-//-----------------------------------------------------------------------------------
+	//---------------------------------------------------------------------------------------
+__global__
+void calc_intensity_kernel  (float *intensity, const int len, const int npol, cufftComplex* fbuf)
+{
+	 int ind  = blockIdx.x * blockDim.x + threadIdx.x;
+	 if (ind < len)
+	 {
+		 intensity[ind] = 0.0f;
+		 for (int i = 0; i < npol / 2; ++i)
+		 {
+			 cufftComplex* p = &fbuf[i * len + ind];
+			 intensity[ind] += (*p).x * (*p).x + (*p).y * (*p).y;
+		 }
+	 }
+}
+//----------------------------------------------------------------------------------------
+// #define BLOCK_DIM 32//16
+//dim3 grid((width + BLOCK_DIM - 1) / BLOCK_DIM, (height + BLOCK_DIM - 1) / BLOCK_DIM, 1);
+//dim3 threads(BLOCK_DIM, BLOCK_DIM, 1);
+//https://github.com/JonathanWatkins/CUDA/blob/master/NvidiaCourse/Exercises/transpose/transpose.cu
+__global__ void transpose(float* odata, float* idata, int width, int height)
+{
+	__shared__ float block[BLOCK_DIM][BLOCK_DIM + 1];
+
+	// read the matrix tile into shared memory
+		// load one element per thread from device memory (idata) and store it
+		// in transposed order in block[][]
+	unsigned int xIndex = blockIdx.x * BLOCK_DIM + threadIdx.x;
+	unsigned int yIndex = blockIdx.y * BLOCK_DIM + threadIdx.y;
+	if ((xIndex < width) && (yIndex < height))
+	{
+		unsigned int index_in = yIndex * width + xIndex;
+		block[threadIdx.y][threadIdx.x] = idata[index_in];
+	}
+
+	// synchronise to ensure all writes to block[][] have completed
+	__syncthreads();
+
+	// write the transposed matrix tile to global memory (odata) in linear order
+	xIndex = blockIdx.y * BLOCK_DIM + threadIdx.x;
+	yIndex = blockIdx.x * BLOCK_DIM + threadIdx.y;
+	if ((xIndex < height) && (yIndex < width))
+	{
+		unsigned int index_out = yIndex * height + xIndex;
+		odata[index_out] = block[threadIdx.x][threadIdx.y];
+	}
+}
+//------------------------------------------
+__global__
+void calcPowerMtrx_kernel(float* output, const int height, const int width, const int npol, cufftComplex* input)
+{
+	__shared__ float tile[TILE_DIM][TILE_DIM + 1]; // Shared memory tile
+	unsigned int xIndex = blockIdx.x * TILE_DIM + threadIdx.x;
+	unsigned int yIndex = blockIdx.y * TILE_DIM + threadIdx.y;
+	if ((xIndex < width) && (yIndex < height))
+	{
+		unsigned int index_in = yIndex * width + xIndex;	
+
+		float sum = 0.;
+		for (int i = 0; i < npol / 2; ++i)
+		{
+			sum += fnc_norm2(&input[i * height * width + index_in]);
+		}
+
+		tile[threadIdx.y][threadIdx.x] = sum;
+	}
+
+	// synchronise to ensure all writes to block[][] have completed
+	__syncthreads();
+   
+	// write the transposed matrix tile to global memory (odata) in linear order
+	xIndex = blockIdx.y * TILE_DIM + threadIdx.x;
+	yIndex = blockIdx.x * TILE_DIM + threadIdx.y;
+	if ((xIndex < height) && (yIndex < width))
+	{
+		unsigned int index_out = yIndex * height + xIndex;
+		output[index_out] = tile[threadIdx.x][threadIdx.y];
+		
+	}
+}
+
+//-----------------------------------------------------------------------------
+__global__
+void dedisperse(float*parr_wfall_disp, float* parrIntesity, double dm,  double f_min, double f_max, double   val_tsamp_wfall, double foff, int cols)
+{
+ int idx0 =  blockIdx.x * blockDim.x + threadIdx.x;
+ if (!(idx0 < cols))
+ {
+	 return;
+ }
+ 
+ int nchans = gridDim.y;
+ int ichan = blockIdx.y;
+ double temp = (double)(nchans - 1 - ichan) * foff + f_min;
+ double temp1 = 4.148808e3 * dm * (1.0 / (f_min * f_min) - 1.0 / (temp * temp));
+ int ishift = round(temp1 / val_tsamp_wfall);
+ 
+ int ind_new = blockIdx.y * cols + (idx0 + ishift) % cols;
+ int ind = blockIdx.y * cols + idx0;
+ if (0 == ichan)
+ {
+	 //printf(" ishift = %i\n", ishift);
+	 //printf(" %.8f\n", parrIntesity[ind]*1000);
+ }
+
+ //
+ parr_wfall_disp[ind_new] =  parrIntesity[ind];
+ if (0 == ind)
+ {
+	 printf(" %.10f    %.10f\n", parrIntesity[ind] , parr_wfall_disp[ind_new]);
+ }
+ //
+ //printf(" %f\n", parr_wfall_disp[ind_new]);
+}
+
+	//--------------------------------------------------------------------------------
 //		
 __global__	void  transpose_unpadd(cufftComplex* fbuf, cufftComplex* arin,int nfft,  int noverlap_per_channel
 	, int mbin_adjusted, const int nchan, const int nlen_sft, int mbin)	
@@ -1019,6 +1249,9 @@ void CChunk_gpu::set_blockid(const int nC)
 __device__
 float fnc_norm2(cufftComplex* pc)
 {
+	/*float x = (*pc).x * 1.0e4;
+	float y = (*pc).y * 1.0e4;
+	return x* x + y * y;*/
 	return ((*pc).x * (*pc).x + (*pc).y * (*pc).y);
 }
 
@@ -1067,36 +1300,7 @@ void calcPartSum_kernel(float* d_parr_out, const int lenChunk, const int npol_ph
 		d_parr_out[ichan * lenChunk + ind] = sum;
 	}
 }
-//------------------------------------------
-__global__
-void calcPowerMtrx_kernel(float* output, const int height, const int width, const int npol, cufftComplex* input)
-{
-	__shared__ float tile[TILE_DIM][TILE_DIM + 1]; // Shared memory tile
-	int x = blockIdx.x * TILE_DIM + threadIdx.x;
-	int y = blockIdx.y * TILE_DIM + threadIdx.y;
-	int ichan = blockIdx.z;
-	// Transpose data from global to shared memory
-	if (x < width && y < height)
-	{
-		float sum = 0.;
-		for (int i = 0; i < npol / 2; ++i)
-		{
-			sum += fnc_norm2(&input[(ichan * npol / 2 + i) * height * width + y * width + x]);
-		}
 
-		tile[threadIdx.y][threadIdx.x] = sum;
-	}
-	__syncthreads();
-
-	// Calculate new indices for writing to output
-	x = blockIdx.y * TILE_DIM + threadIdx.x;
-	y = blockIdx.x * TILE_DIM + threadIdx.y;
-
-	// Transpose data from shared to global memory
-	if (x < height && y < width) {
-		output[ichan * height * width + y * height + x] = tile[threadIdx.x][threadIdx.y];
-	}
-}
 //------------------------------------------
 __global__
 void multiTransp_kernel(float* output, const int height, const int width, float* input)

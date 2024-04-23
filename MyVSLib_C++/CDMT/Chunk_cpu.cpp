@@ -1,9 +1,9 @@
 #include "Chunk_cpu.h"
 #include <chrono>
 #include <cmath>
-//#include "npy.hpp"
-#include "FdmtCpu.h"
+#include "npy.hpp"
 #include <algorithm>
+#include <vector>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -24,6 +24,7 @@ CChunk_cpu::CChunk_cpu(const  CChunk_cpu& R) :CChunkB(R)
 	}
 	strcpy(m_str_wis_forw, R.m_str_wis_forw);
 	strcpy(m_str_wis_back, R.m_str_wis_back);
+	m_fdmt = R.m_fdmt;
 }
 //-------------------------------------------------------------------
 
@@ -46,6 +47,7 @@ CChunk_cpu& CChunk_cpu::operator=(const CChunk_cpu& R)
 
 	strcpy(m_str_wis_forw, R.m_str_wis_forw);
 	strcpy(m_str_wis_back, R.m_str_wis_back);
+	m_fdmt = R.m_fdmt;
 	return *this;
 }
 //------------------------------------------------------------------
@@ -88,6 +90,19 @@ CChunk_cpu::CChunk_cpu(
 	//2.create dc vector
 	m_dc_Vector.resize(ndm * m_nchan * m_nbin);
 
+
+	const int msamp = get_msamp();
+	m_fdmt = CFdmtCpu (
+		m_Fmin
+		, m_Fmax
+		, m_len_sft * m_nchan// quant channels/rows of input image, including consisting of zeroes
+		, msamp
+		, m_len_sft// quantity of rows of output image
+	);
+
+	float* parr = (float*)malloc(m_len_sft * m_nchan * msamp * sizeof(float));
+	m_fdmt.process_image(NULL, parr, true);
+	free(parr);
 	//auto start = std::chrono::high_resolution_clock::now();
 	compute_chirp_channel(&m_dc_Vector, &m_coh_dm_Vector);
 	//auto end = std::chrono::high_resolution_clock::now();
@@ -125,6 +140,8 @@ CChunk_cpu::CChunk_cpu(
 
 	 fftwf_free(in);
 	 fftwf_free(out);
+
+	
 }
 
 
@@ -187,15 +204,15 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 	}
 	
 	// !4
-
+	
 	// 5. define FDMT instance
-	CFdmtCpu  fdmt(
-		m_Fmin
-		, m_Fmax
-		,  m_len_sft * m_nchan// quant channels/rows of input image, including consisting of zeroes
-		, msamp
-		, m_len_sft// quantity of rows of output image
-	);
+	//CFdmtCpu  fdmt(
+	//	m_Fmin
+	//	, m_Fmax
+	//	,  m_len_sft * m_nchan// quant channels/rows of input image, including consisting of zeroes
+	//	, msamp
+	//	, m_len_sft// quantity of rows of output image
+	//);
 	//fdmt.process_image(nullptr, parr_fdmt_norm, true);
 	// 5!
 	
@@ -272,7 +289,12 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 		}
 	}
 		// 12!		
-
+	/*int lenarr4 = msamp * m_nchan * m_len_sft;
+	std::vector<float> data4(lenarr4, 0);
+	memcpy(data4.data(), parr_wfall, lenarr4 * sizeof(float));	
+	std::array<long unsigned, 1> leshape2{ lenarr4 };
+	npy::SaveArrayAsNumpy("parr_wfall_cpu.npy", false, leshape2.size(), leshape2.data(), data4);
+	int ii = 0;*/
 	// 13. dedisperse		
 		fnc_dedisperse(parr_wfall, m_coh_dm_Vector[idm], m_tsamp * m_len_sft);	
 	// 13!	
@@ -280,7 +302,7 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 	// 14. FDMT-processing		
 		//fdmt.process_image(parr_wfall, &parr_cdmt_transform[m_len_sft * msamp * idm], false);
 		
-		fdmt.process_image(parr_wfall, pvecImg_temp->at(idm).data(), false);
+		m_fdmt.process_image(parr_wfall, pvecImg_temp->at(idm).data(), false);
 		
 		//pvecImg->resize(m_coh_dm_Vector.size() * m_len_sft, msamp);
 	// 14!			

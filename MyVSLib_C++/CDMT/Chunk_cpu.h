@@ -1,8 +1,10 @@
 #pragma once
 
 #include "ChunkB.h"
+#include "FdmtCpu.h"
 class COutChunkHeader;
 class CChunkB;
+class CFdmtCpu;
 #include <fftw3.h>
 #include <complex> 
 #define STR_WIS_LEN 10000
@@ -37,6 +39,7 @@ public:
 
 	std::vector<std::complex<float>> m_dc_Vector;
 
+	CFdmtCpu m_fdmt;
 	
 
 	char m_str_wis_forw[STR_WIS_LEN];
