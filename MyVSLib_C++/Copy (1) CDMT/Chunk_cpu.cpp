@@ -90,15 +90,19 @@ CChunk_cpu::CChunk_cpu(
 	//2.create dc vector
 	m_dc_Vector.resize(ndm * m_nchan * m_nbin);
 
+
 	const int msamp = get_msamp();
 	m_fdmt = CFdmtCpu (
 		m_Fmin
 		, m_Fmax
-		, m_len_sft * m_nchan// quant channels/rows of input image
+		, m_len_sft * m_nchan// quant channels/rows of input image, including consisting of zeroes
 		, msamp
 		, m_len_sft// quantity of rows of output image
 	);
-	
+
+	float* parr = (float*)malloc(m_len_sft * m_nchan * msamp * sizeof(float));
+	m_fdmt.process_image(NULL, parr, true);
+	free(parr);
 	//auto start = std::chrono::high_resolution_clock::now();
 	compute_chirp_channel(&m_dc_Vector, &m_coh_dm_Vector);
 	//auto end = std::chrono::high_resolution_clock::now();
@@ -136,6 +140,7 @@ CChunk_cpu::CChunk_cpu(
 
 	 fftwf_free(in);
 	 fftwf_free(out);
+
 	
 }
 
@@ -174,6 +179,7 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 	
 	fftwf_complex* parr_ffted = (fftwf_complex*)pcmparrRawSignalCur;
 	float* parr_fdmt_res = (float*)malloc(m_len_sft  * msamp * sizeof(float));
+
 
 	float* parr_cdmt_transform = nullptr;
 

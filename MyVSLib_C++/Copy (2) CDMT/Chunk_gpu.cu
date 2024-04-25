@@ -298,13 +298,13 @@ void kernel_create_arr_dc  (cufftComplex* parr_dc, double * parrcoh_dm,double* p
 {
 	//__shared__  double temp0[1];
 	//__shared__  int i0[1];
-	
+	//printf("ququ");
 	int ibin = blockIdx.x * blockDim.x + threadIdx.x;
 	if (ibin >= mbin)
 	{
 		return;
 	}
-	
+	//printf("ququ1");
 	int num1 = blockIdx.y * blockDim.y + threadIdx.y;
 	if (num1 >= nchan * len_sft)
 	{
@@ -330,9 +330,15 @@ void kernel_create_arr_dc  (cufftComplex* parr_dc, double * parrcoh_dm,double* p
 	double phase_delay=(parrcoh_dm[idm] * temp1 * temp1 / (temp0 + parr_bin_freqs[ibin]) * 4.148808e9);
 	double val_prD_int = 0;
 	double t = -modf(phase_delay, &val_prD_int) * 2.0;
-	double val_x = 0.0, val_y = 0.;	
+	double val_x = 0.0, val_y = 0.;
 	
-	sincospi(t, &val_y, &val_x);	
+	
+	sincospi(t, &val_y, &val_x);
+	//printf("val_x = %f ;\n", (float)val_x);
+	if (val_x > 0.0)
+	{
+		//printf("val_x = % ;\n", (float)val_x);
+	}
 	parr_dc[i0 + ibin].x = float(val_x * parr_taper[ibin]);
 	parr_dc[i0 + ibin].y = float(val_y * parr_taper[ibin]);
 	
@@ -550,15 +556,25 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 				, (double)m_Fmin, (double)m_Fmax,  val_tsamp_wfall, f0, msamp);
 			cudaDeviceSynchronize();
 
-			/*int lenarr4 = msamp * m_nchan * m_len_sft;
+			int lenarr4 = msamp * m_nchan * m_len_sft;
 			std::vector<float> data4(lenarr4, 0);
 			cudaMemcpy(data4.data(), parr_wfall_disp, lenarr4 * sizeof(float), cudaMemcpyDeviceToHost);
 			cudaDeviceSynchronize();
 			std::array<long unsigned, 1> leshape2{ lenarr4 };
 			npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
-			int ii = 0;*/
+			int ii = 0;
 			
-			m_Fdmt.process_image(parr_wfall_disp, &poutImg[idm * msamp * m_len_sft], false);			
+
+			CFdmtGpu fdmt(
+				m_Fmin
+				, m_Fmax
+				, m_nchan* m_len_sft // quant channels/rows of input image
+				, msamp
+				, m_len_sft
+			);
+			
+			fdmt.process_image(parr_wfall_disp, &poutImg[idm * msamp * m_len_sft], false);
+			//cudaFree(parrIntesity);
 			cudaFree(pcmparrRawSignalRolled1);
 			cudaFree(fbuf);
 
@@ -690,9 +706,20 @@ void dedisperse(float*parr_wfall_disp, float* parrIntesity, double dm,  double f
  
  int ind_new = blockIdx.y * cols + (idx0 + ishift) % cols;
  int ind = blockIdx.y * cols + idx0;
+ if (0 == ichan)
+ {
+	 //printf(" ishift = %i\n", ishift);
+	 //printf(" %.8f\n", parrIntesity[ind]*1000);
+ }
+
  //
  parr_wfall_disp[ind_new] =  parrIntesity[ind];
- 
+ if (0 == ind)
+ {
+	 printf(" %.10f    %.10f\n", parrIntesity[ind] , parr_wfall_disp[ind_new]);
+ }
+ //
+ //printf(" %f\n", parr_wfall_disp[ind_new]);
 }
 
 	//--------------------------------------------------------------------------------
@@ -710,19 +737,75 @@ __global__	void  transpose_unpadd(cufftComplex* fbuf, cufftComplex* arin,int nff
 	int ichan = blockIdx.y / nlen_sft;
 	int ilen_sft = blockIdx.y % nlen_sft;
 	int ibin_adjusted = ibin + noverlap_per_channel;
-	int isamp = ibin + mbin_adjusted * ifft;	 
+	int isamp = ibin + mbin_adjusted * ifft;
+	 
 	
 	// Select bins from valid region and reverse the frequency axis		
-	
+	// float temp = arin[ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted].y;
+	 //printf("%f \n", temp);
 	
 	fbuf[ipol * mbin_adjusted * nchan * nlen_sft  +  isamp * nchan * nlen_sft + ichan * nlen_sft + nlen_sft - ilen_sft - 1].x =
 		arin[ipol * nfft * nchan * nlen_sft * mbin + ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted].x;
 	fbuf[ipol * mbin_adjusted * nchan * nlen_sft +  isamp * nchan * nlen_sft + ichan * nlen_sft + nlen_sft - ilen_sft - 1].y =
 		arin[ipol *  nfft * nchan * nlen_sft * mbin +  ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted].y;
-	
+	//for (int ifft = 0; ifft < nfft; ++ifft)
+	//{
+	//	for (int ichan = 0; ichan < nchan; ++ichan)
+	//	{
+	//		for (int ilen_sft = 0; ilen_sft < nlen_sft; ++ilen_sft)
+	//		{
+	//			for (int ibin = 0; ibin < mbin_adjusted; ++ibin)
+	//			{
+	//				int ibin_adjusted = ibin + noverlap_per_channel;
+	//				int isamp = ibin + mbin_adjusted * ifft;
+
+
+	//				// Select bins from valid region and reverse the frequency axis					
+	//				fbuf[isamp * nchan * nlen_sft + ichan * nlen_sft + nlen_sft - ilen_sft - 1][0] =
+	//					arin[ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted][0];
+	//				fbuf[isamp * nchan * nlen_sft + ichan * nlen_sft + nlen_sft - ilen_sft - 1][1] =
+	//					arin[ifft * nchan * nlen_sft * mbin + (nchan - ichan - 1) * nlen_sft * mbin + ilen_sft * mbin + ibin_adjusted][1];
+
+
+	//			}
+	//		}
+	//	}
+	//}
 }
 	
-
+//
+//	void  CChunk_cpu::transpose_unpadd(fftwf_complex* arin, fftwf_complex* fbuf)
+//	{
+//		int noverlap_per_channel = get_noverlap_per_channel();
+//		int mbin_adjusted = get_mbin_adjusted();
+//		const int nsub = m_nchan;
+//		const int nchan = m_len_sft;
+//		const int mbin = get_mbin();
+//#pragma omp parallel
+//		{
+//			for (int ifft = 0; ifft < m_nfft; ++ifft)
+//			{
+//				for (int ichan = 0; ichan < nchan; ++ichan)
+//				{
+//					for (int ibin = 0; ibin < mbin_adjusted; ++ibin)
+//					{
+//						int ibin_adjusted = ibin + noverlap_per_channel;
+//						int isamp = ibin + mbin_adjusted * ifft;
+//						int num = 0;
+//						for (int isub = 0; isub < nsub; ++isub)
+//						{
+//							// Select bins from valid region and reverse the frequency axis					
+//							fbuf[isamp * nsub * nchan + isub * nchan + nchan - ichan - 1][0] =
+//								arin[ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted][0];
+//							fbuf[isamp * nsub * nchan + isub * nchan + nchan - ichan - 1][1] =
+//								arin[ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted][1];
+//							++num;
+//						}
+//					}
+//				}
+//			}
+//		}
+//	}
 	//-----------------------------------------------------------------------
 	__global__ void  divide_cufftComplex_array_kernel(cufftComplex* d_arr, int len, float val)
 	{
@@ -735,6 +818,7 @@ __global__	void  transpose_unpadd(cufftComplex* fbuf, cufftComplex* arin,int nff
 		d_arr[idx].y /= val;
 	}
 //-------------------------------------------------------------------------------------------------
+	//---------------------------------------------------------------
 	__global__
 		void scaling_kernel(cufftComplex* data, long long element_count, float scale)
 	{
@@ -754,12 +838,13 @@ __global__ void  element_wise_cufftComplex_mult_kernel(cufftComplex * d_arrOut, 
 	{
 		return;
 	}
-
+	//printf("ff\n");
 	int ipol = blockIdx.z;
 	int ifft = blockIdx.y;
 	int ibegin = ipol * nfft * dim2 + ifft * dim2;
 	d_arrOut[ibegin + idx].x = d_arrInp0[ibegin + idx].x* d_arrInp1[idx].x - d_arrInp0[ibegin + idx].y * d_arrInp1[idx].y;
 	d_arrOut[ibegin + idx].y = d_arrInp0[ibegin + idx].x* d_arrInp1[idx].y + d_arrInp0[ibegin + idx].y * d_arrInp1[idx].x;
+	//printf("%f  %f\n", d_arrOut[ibegin + idx].x, d_arrOut[ibegin + idx].y);
 	
 }
 	

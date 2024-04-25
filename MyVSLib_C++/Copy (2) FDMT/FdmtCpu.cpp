@@ -52,13 +52,13 @@ void CFdmtCpu::process_image(fdmt_type_* piarrImgInp, fdmt_type_* piarrImgOut, c
 	// !1
 
 	// 2. allocate memory 
-	if (!(piarrOut_0 = (fdmt_type_*)calloc(m_pparrRowsCumSum_h[0][m_parrQuantMtrx_h[0]] * m_cols, sizeof(fdmt_type_))))
+	if (!(piarrOut_0 = (fdmt_type_*)calloc(m_pparrRowsCumSum_h[0][m_parrQuantMtrx[0]] * m_cols, sizeof(fdmt_type_))))
 	{
 		printf("Can't allocate memory  for piarrOut_0 in  CFdmtCpu::process_image(..)");
 		return;
 	}
 
-	if (!(piarrOut_1 = (fdmt_type_*)calloc((m_pparrRowsCumSum_h[1])[m_parrQuantMtrx_h[1]] * m_cols, sizeof(fdmt_type_))))
+	if (!(piarrOut_1 = (fdmt_type_*)calloc((m_pparrRowsCumSum_h[1])[m_parrQuantMtrx[1]] * m_cols, sizeof(fdmt_type_))))
 	{
 		printf("Can't allocate memory  for piarrOut_1 in  CFdmtCpu::process_image(..)");
 		free(piarrOut_0);
@@ -97,13 +97,13 @@ void CFdmtCpu::process_image(fdmt_type_* piarrImgInp, fdmt_type_* piarrImgOut, c
 void CFdmtCpu::fncFdmtIterationC(fdmt_type_* p0, const int  iit, fdmt_type_* p1)
 {
 	// 1. extract config for previous mtrix (p0 matrix)  
-	int quantSubMtrx = m_parrQuantMtrx_h[iit - 1]; // quant of submatixes
+	int quantSubMtrx = m_parrQuantMtrx[iit - 1]; // quant of submatixes
 	int* iarrCumSum = m_pparrRowsCumSum_h[iit - 1];
 	float* arrFreq = m_pparrFreq_h[iit - 1];
 	// 1!  
 
 	// 2. extract config for curent matrix (p0 matrix)
-	int quantSubMtrxCur = m_parrQuantMtrx_h[iit]; // quant of submatixes
+	int quantSubMtrxCur = m_parrQuantMtrx[iit]; // quant of submatixes
 	int* iarrCumSumCur = m_pparrRowsCumSum_h[iit];
 	float* arrFreqCur = m_pparrFreq_h[iit];
 	// 2! 

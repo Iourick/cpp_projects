@@ -214,7 +214,7 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
     for (int nB = 0; nB < IBlock; ++nB)        
     {          
         std::cout << "                               BLOCK=  " << nB <<std::endl;  
-        createCurrentTelescopeHeader(prb_File);     
+        createCurrentTelescopeHeader(prb_File);        
        
         const int NumChunks = (m_header.m_nblocksize - 2 *QUantOverlapBytes - 1) / (QUantChunkBytes - 2 *QUantOverlapBytes) + 1;
         // !6           
@@ -231,16 +231,19 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
             {
                 size_t shift = calc_ShiftingBytes(2 * QUantOverlapBytes);
                 shift_file_pos(prb_File, -shift);
-            }           
+            }
+           
             unpack_chunk(LenChunk, Noverlap,  (inp_type_*)parrInput,  pcmparrRawSignalCur);
            (*ppChunk)->set_blockid(nB);
            (*ppChunk)->set_chunkid(j);
            (*ppChunk)->process(pcmparrRawSignalCur, m_pvctSuccessHeaders, pvecImg);
 
            // TEMPORARY FOR DEBUGGING LOFAR ONLY! DELETE LATER!
-           break;          
+           break;
+          
         }
-        *pmsamp = (*ppChunk)-> get_msamp();        
+        *pmsamp = (*ppChunk)-> get_msamp();
+        
 
         //std::cout << "/*****************************************************/ " << std::endl;
         //std::cout << "/*****************************************************/ " << std::endl;
@@ -256,11 +259,16 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
         //std::cout << "/*****************************************************/ " << std::endl;
         //std::cout << "/*****************************************************/ " << std::endl;
         //std::cout << "/*****************************************************/ " << std::endl;	
-        rewindFilePos(prb_File,   QUantTotalChannelBytes);            
+        rewindFilePos(prb_File,   QUantTotalChannelBytes);    
+
+        
     }
-   closeFileReadingStream(prb_File);     
-   freeInputMemory(parrInput, pcmparrRawSignalCur);    
-    delete (*ppChunk);  
+   closeFileReadingStream(prb_File);  
+   
+   freeInputMemory(parrInput, pcmparrRawSignalCur);
+    
+    delete (*ppChunk);
+   // delete pvecImg;
     ppChunk = nullptr;    
     return 0;
 }

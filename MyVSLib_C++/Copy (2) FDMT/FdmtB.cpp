@@ -36,10 +36,10 @@ CFdmtB::~CFdmtB()
 			free(m_pparrRowsCumSum_h);
 		}			
 
-		if (m_parrQuantMtrx_h != NULL)
+		if (m_parrQuantMtrx != NULL)
 		{
-			free(m_parrQuantMtrx_h);
-			m_parrQuantMtrx_h = NULL;
+			free(m_parrQuantMtrx);
+			m_parrQuantMtrx = NULL;
 		}
 	
 	m_iNumIter = 0;
@@ -54,7 +54,7 @@ CFdmtB::CFdmtB()
 	m_imaxDt = 0;
 	m_pparrRowsCumSum_h = NULL;
 	m_pparrFreq_h = NULL;
-	m_parrQuantMtrx_h = NULL;
+	m_parrQuantMtrx = NULL;
 	m_iNumIter = 0;
 }
 //-----------------------------------------------------------
@@ -68,21 +68,21 @@ CFdmtB::CFdmtB(const  CFdmtB& R) :CFdmtB()
 	m_imaxDt = R.m_imaxDt;
 	m_iNumIter = R.m_iNumIter;
 	
-	m_parrQuantMtrx_h = (int*)malloc((R.m_iNumIter + 1) * sizeof(int));
-	memcpy(m_parrQuantMtrx_h, R.m_parrQuantMtrx_h, (R.m_iNumIter + 1) * sizeof(int));
+	m_parrQuantMtrx = (int*)malloc((R.m_iNumIter + 1) * sizeof(int));
+	memcpy(m_parrQuantMtrx, R.m_parrQuantMtrx, (R.m_iNumIter + 1) * sizeof(int));
 
 	m_pparrFreq_h = (float**)malloc((R.m_iNumIter + 1) * sizeof(float*));
 	for (int i = 0; i < (R.m_iNumIter + 1); ++i)
 	{
-		m_pparrFreq_h[i] = (float*)malloc((1 + R.m_parrQuantMtrx_h[i]) * sizeof(float));
-		memcpy(m_pparrFreq_h[i], R.m_pparrFreq_h[i], (1 + R.m_parrQuantMtrx_h[i]) * sizeof(float));
+		m_pparrFreq_h[i] = (float*)malloc((1 + R.m_parrQuantMtrx[i]) * sizeof(float));
+		memcpy(m_pparrFreq_h[i], R.m_pparrFreq_h[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(float));
 	}
 
 	m_pparrRowsCumSum_h = (int**)malloc((R.m_iNumIter + 1) * sizeof(int*));
 	for (int i = 0; i < (R.m_iNumIter + 1); ++i)
 	{
-		m_pparrRowsCumSum_h[i] = (int*)malloc((1 + R.m_parrQuantMtrx_h[i]) * sizeof(int));
-		memcpy(m_pparrRowsCumSum_h[i], R.m_pparrRowsCumSum_h[i], (1 + R.m_parrQuantMtrx_h[i]) *  sizeof(int));
+		m_pparrRowsCumSum_h[i] = (int*)malloc((1 + R.m_parrQuantMtrx[i]) * sizeof(int));
+		memcpy(m_pparrRowsCumSum_h[i], R.m_pparrRowsCumSum_h[i], (1 + R.m_parrQuantMtrx[i]) *  sizeof(int));
 	}
 }
 //-------------------------------------------------------------------
@@ -109,8 +109,8 @@ CFdmtB& CFdmtB::operator=(const CFdmtB& R)
 	{
 		for (int i = 0; i < (R.m_iNumIter + 1); ++i)
 		{
-			m_pparrFreq_h[i] = (float*)malloc((1 + R.m_parrQuantMtrx_h[i]) * sizeof(float));
-			memcpy(m_pparrFreq_h[i], R.m_pparrFreq_h[i], (1 + R.m_parrQuantMtrx_h[i]) * sizeof(float));
+			m_pparrFreq_h[i] = (float*)malloc((1 + R.m_parrQuantMtrx[i]) * sizeof(float));
+			memcpy(m_pparrFreq_h[i], R.m_pparrFreq_h[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(float));
 		}
 	}
 	
@@ -124,18 +124,18 @@ CFdmtB& CFdmtB::operator=(const CFdmtB& R)
 	{
 		for (int i = 0; i < (R.m_iNumIter + 1); ++i)
 		{
-			m_pparrRowsCumSum_h[i] = (int*)malloc((1 + R.m_parrQuantMtrx_h[i]) * sizeof(int));
-			memcpy(m_pparrRowsCumSum_h[i], R.m_pparrRowsCumSum_h[i], (1 + R.m_parrQuantMtrx_h[i]) * sizeof(int));
+			m_pparrRowsCumSum_h[i] = (int*)malloc((1 + R.m_parrQuantMtrx[i]) * sizeof(int));
+			memcpy(m_pparrRowsCumSum_h[i], R.m_pparrRowsCumSum_h[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(int));
 		}
 	}	
 
-	if (m_parrQuantMtrx_h != NULL)
+	if (m_parrQuantMtrx != NULL)
 	{
-		free(m_parrQuantMtrx_h);
-		m_parrQuantMtrx_h = NULL;
+		free(m_parrQuantMtrx);
+		m_parrQuantMtrx = NULL;
 	}
-	m_parrQuantMtrx_h = (int*)malloc((R.m_iNumIter + 1) * sizeof(int));
-	memcpy(m_parrQuantMtrx_h, R.m_parrQuantMtrx_h, (R.m_iNumIter + 1) * sizeof(int));
+	m_parrQuantMtrx = (int*)malloc((R.m_iNumIter + 1) * sizeof(int));
+	memcpy(m_parrQuantMtrx, R.m_parrQuantMtrx, (R.m_iNumIter + 1) * sizeof(int));
 	return *this;
 }
 
@@ -154,7 +154,7 @@ CFdmtB::CFdmtB(
 	m_cols = cols;
 	m_imaxDt = imaxDt;
 
-	create_config(m_pparrRowsCumSum_h, m_pparrFreq_h, &m_parrQuantMtrx_h, &m_iNumIter);
+	create_config(m_pparrRowsCumSum_h, m_pparrFreq_h, &m_parrQuantMtrx, &m_iNumIter);
 }
 
 ////-------------------------------------------------------------------------

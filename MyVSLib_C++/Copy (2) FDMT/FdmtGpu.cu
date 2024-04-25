@@ -57,24 +57,12 @@ CFdmtGpu::~CFdmtGpu()
 	m_arrOut1 = NULL;
 	}
 
-	if (m_parrMaxQuantRows_h != NULL)
+	if (m_parrMaxQuantRowsHost != NULL)
 	{
-	free(m_parrMaxQuantRows_h);
-	m_parrMaxQuantRows_h = NULL;
+	free(m_parrMaxQuantRowsHost);
+	m_parrMaxQuantRowsHost = NULL;
 	}
-
-	if (m_parrQuantMtrx_d != NULL)
-	{
-		cudaFree(m_parrQuantMtrx_d);
-		m_parrQuantMtrx_d = NULL;
-	}
-
-	if (m_pcols_d != NULL)
-	{
-		cudaFree(m_pcols_d);
-		m_pcols_d = NULL;
-	}
-	
+	m_iNumIter = 0;
 	
 }
 //---------------------------------------
@@ -85,11 +73,9 @@ CFdmtGpu::CFdmtGpu():CFdmtB()
 	m_lenSt0 = 0;
 	m_lenSt1 = 0;
 	m_iNumIter = 0;	
-	m_parrMaxQuantRows_h = NULL;
+	m_parrMaxQuantRowsHost = NULL;
 	m_pparrRowsCumSum_d = NULL;
 	m_pparrFreq_d = NULL;
-	m_parrQuantMtrx_d = NULL;
-	m_pcols_d = NULL;
 }
 //-----------------------------------------------------------
 
@@ -97,27 +83,19 @@ CFdmtGpu::CFdmtGpu(const  CFdmtGpu& R) :CFdmtB()
 {	
 	m_lenSt0 = R.m_lenSt0;
 	m_lenSt1 = R.m_lenSt1;	
-
 	
-	cudaMalloc((void**) & m_parrQuantMtrx_d, (1 + R.m_iNumIter) * sizeof(int));
-	cudaMemcpy(m_parrQuantMtrx_d, R.m_parrQuantMtrx_d, (1 + R.m_iNumIter) * sizeof(int), cudaMemcpyDeviceToDevice);
-
-	cudaMalloc((void**)&m_pcols_d, sizeof(int));
-	cudaMemcpy(m_pcols_d, R.m_pcols_d,  sizeof(int), cudaMemcpyDeviceToDevice);
-	
-
 	m_pparrFreq_d = (float**)malloc((R.m_iNumIter + 1) * sizeof(float*));
 	for (int i = 0; i < (R.m_iNumIter + 1); ++i)
 	{
-		cudaMalloc(&m_pparrFreq_d[i], (1 + R.m_parrQuantMtrx_h[i]) * sizeof(float));
-		cudaMemcpy(m_pparrFreq_d[i], R.m_pparrFreq_d[i], (1 + R.m_parrQuantMtrx_h[i]) * sizeof(float), cudaMemcpyDeviceToDevice);
+		cudaMalloc(&m_pparrFreq_d[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(float));
+		cudaMemcpy(m_pparrFreq_d[i], R.m_pparrFreq_d[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(float), cudaMemcpyDeviceToDevice);
 	}	
 
 	m_pparrRowsCumSum_d = (int**)malloc((R.m_iNumIter + 1) * sizeof(int*));
 	for (int i = 0; i < (R.m_iNumIter + 1); ++i)
 	{
-		cudaMalloc(&m_pparrRowsCumSum_d[i], (1 + R.m_parrQuantMtrx_h[i]) * sizeof(int));
-		cudaMemcpy(m_pparrRowsCumSum_d[i], R.m_pparrRowsCumSum_d[i], (1 + R.m_parrQuantMtrx_h[i]) * sizeof(int), cudaMemcpyDeviceToDevice);
+		cudaMalloc(&m_pparrRowsCumSum_d[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(int));
+		cudaMemcpy(m_pparrRowsCumSum_d[i], R.m_pparrRowsCumSum_d[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(int), cudaMemcpyDeviceToDevice);
 	}
 	cudaMalloc(&m_arrOut0, R.m_lenSt0 * sizeof(fdmt_type_));
 	cudaMemcpy(m_arrOut0, R.m_arrOut0, R.m_lenSt0 * sizeof(fdmt_type_), cudaMemcpyDeviceToDevice);
@@ -125,8 +103,8 @@ CFdmtGpu::CFdmtGpu(const  CFdmtGpu& R) :CFdmtB()
 	cudaMalloc(&m_arrOut1, R.m_lenSt1 * sizeof(fdmt_type_));
 	cudaMemcpy(m_arrOut1, R.m_arrOut1, R.m_lenSt1 * sizeof(fdmt_type_), cudaMemcpyDeviceToDevice);	
 
-	m_parrMaxQuantRows_h = (int*)malloc((R.m_iNumIter + 1) * sizeof(int));
-	memcpy(m_parrMaxQuantRows_h, R.m_parrMaxQuantRows_h, (R.m_iNumIter + 1) * sizeof(int));
+	m_parrMaxQuantRowsHost = (int*)malloc((R.m_iNumIter + 1) * sizeof(int));
+	memcpy(m_parrMaxQuantRowsHost, R.m_parrMaxQuantRowsHost, (R.m_iNumIter + 1) * sizeof(int));
 }
 //-------------------------------------------------------------------
 CFdmtGpu& CFdmtGpu::operator=(const CFdmtGpu& R)
@@ -138,22 +116,6 @@ CFdmtGpu& CFdmtGpu::operator=(const CFdmtGpu& R)
 	CFdmtB:: operator= (R);
 	m_lenSt0 = R.m_lenSt0;
 	m_lenSt1 = R.m_lenSt1;
-
-	if (m_parrQuantMtrx_d != NULL)
-	{
-		cudaFree(m_parrQuantMtrx_d);
-		m_parrQuantMtrx_d = NULL;
-	}
-	cudaMalloc((void**)&m_parrQuantMtrx_d, (1 + R.m_iNumIter) * sizeof(int));
-	cudaMemcpy(m_parrQuantMtrx_d, R.m_parrQuantMtrx_d, (1 + R.m_iNumIter) * sizeof(int), cudaMemcpyDeviceToDevice);
-
-	if (m_pcols_d != NULL)
-	{
-		cudaFree(m_pcols_d);
-		m_pcols_d = NULL;
-	}
-	cudaMalloc((void**)&m_pcols_d, sizeof(int));
-	cudaMemcpy(m_pcols_d, R.m_pcols_d, sizeof(int), cudaMemcpyDeviceToDevice);
 
 	if (m_pparrFreq_d != NULL)
 	{
@@ -170,8 +132,8 @@ CFdmtGpu& CFdmtGpu::operator=(const CFdmtGpu& R)
 	m_pparrFreq_d = (float**)malloc((R.m_iNumIter + 1) * sizeof(float*));
 	for (int i = 0; i < (R.m_iNumIter + 1); ++i)
 	{
-		cudaMalloc(&m_pparrFreq_d[i], (1 + R.m_parrQuantMtrx_h[i]) * sizeof(float));
-		cudaMemcpy(m_pparrFreq_d[i], R.m_pparrFreq_d[i], (1 + R.m_parrQuantMtrx_h[i]) * sizeof(float), cudaMemcpyDeviceToDevice);
+		cudaMalloc(&m_pparrFreq_d[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(float));
+		cudaMemcpy(m_pparrFreq_d[i], R.m_pparrFreq_d[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(float), cudaMemcpyDeviceToDevice);
 	}
 	
 	if (m_pparrRowsCumSum_d != NULL)
@@ -189,8 +151,8 @@ CFdmtGpu& CFdmtGpu::operator=(const CFdmtGpu& R)
 	m_pparrRowsCumSum_d = (int**)malloc((R.m_iNumIter + 1) * sizeof(int*));
 	for (int i = 0; i < (R.m_iNumIter + 1); ++i)
 	{
-		cudaMalloc(&m_pparrRowsCumSum_d[i], (1 + R.m_parrQuantMtrx_h[i]) * sizeof(int));
-		cudaMemcpy(m_pparrRowsCumSum_d[i], R.m_pparrRowsCumSum_d[i], (1 + R.m_parrQuantMtrx_h[i]) * sizeof(int), cudaMemcpyDeviceToDevice);
+		cudaMalloc(&m_pparrRowsCumSum_d[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(int));
+		cudaMemcpy(m_pparrRowsCumSum_d[i], R.m_pparrRowsCumSum_d[i], (1 + R.m_parrQuantMtrx[i]) * sizeof(int), cudaMemcpyDeviceToDevice);
 	}		
 	
 	
@@ -212,12 +174,12 @@ CFdmtGpu& CFdmtGpu::operator=(const CFdmtGpu& R)
 	
 	
 	//!
-	if (m_parrMaxQuantRows_h != NULL)
+	if (m_parrMaxQuantRowsHost != NULL)
 	{
-		free(m_parrMaxQuantRows_h);
+		free(m_parrMaxQuantRowsHost);
 	}
-	m_parrMaxQuantRows_h = (int*)malloc((R.m_iNumIter + 1) * sizeof(int));
-	memcpy(m_parrMaxQuantRows_h, R.m_parrMaxQuantRows_h, (R.m_iNumIter + 1) * sizeof(int));
+	m_parrMaxQuantRowsHost = (int*)malloc((R.m_iNumIter + 1) * sizeof(int));
+	memcpy(m_parrMaxQuantRowsHost, R.m_parrMaxQuantRowsHost, (R.m_iNumIter + 1) * sizeof(int));
 
 	return *this;
 }
@@ -230,37 +192,38 @@ CFdmtGpu::CFdmtGpu(
 	, const int cols
 	, const int imaxDt // quantity of rows of output image
 ) : CFdmtB(Fmin, Fmax, nchan, cols, imaxDt)
-{	
-	cudaMalloc((void**)&m_parrQuantMtrx_d, (1 + m_iNumIter) * sizeof(int));
-	cudaMemcpy(m_parrQuantMtrx_d, m_parrQuantMtrx_h, (1 + m_iNumIter) * sizeof(int), cudaMemcpyHostToDevice);
+{
+	
+	 
+	//int** pparrRowsCumSum = NULL;
+	//float **pparrFreq = NULL;	
+	//create_config(pparrRowsCumSum, pparrFreq, &m_parrQuantMtrxHost, &m_iNumIter);
 
-	cudaMalloc((void**)&m_pcols_d, sizeof(int));
-	cudaMemcpy(m_pcols_d, &m_cols, sizeof(int), cudaMemcpyHostToDevice);
 	
 
-	m_parrMaxQuantRows_h = (int*)malloc((m_iNumIter + 1) * sizeof(int));
+	m_parrMaxQuantRowsHost = (int*)malloc((m_iNumIter + 1) * sizeof(int));
 	for (int i = 0; i < (m_iNumIter + 1); ++i)
 	{
-		m_parrMaxQuantRows_h[i] = (m_pparrRowsCumSum_h[i])[1];
+		m_parrMaxQuantRowsHost[i] = (m_pparrRowsCumSum_h[i])[1];
 	}
 
 	
 	m_pparrFreq_d = (float**)malloc((m_iNumIter + 1) * sizeof(float*));
 	for (int i = 0; i < (m_iNumIter + 1); ++i)
 	{
-		cudaMalloc(&m_pparrFreq_d[i], (1 + m_parrQuantMtrx_h[i]) * sizeof(float));
-		cudaMemcpy(m_pparrFreq_d[i], m_pparrFreq_h[i], (1 + m_parrQuantMtrx_h[i]) * sizeof(float), cudaMemcpyHostToDevice);
+		cudaMalloc(&m_pparrFreq_d[i], (1 + m_parrQuantMtrx[i]) * sizeof(float));
+		cudaMemcpy(m_pparrFreq_d[i], m_pparrFreq_h[i], (1 + m_parrQuantMtrx[i]) * sizeof(float), cudaMemcpyHostToDevice);
 	}
 	
 	m_pparrRowsCumSum_d = (int**)malloc((m_iNumIter + 1) * sizeof(int*));
 	for (int i = 0; i < (m_iNumIter + 1); ++i)
 	{
-		cudaMalloc(&m_pparrRowsCumSum_d[i], (1 + m_parrQuantMtrx_h[i]) * sizeof(int));
-		cudaMemcpy(m_pparrRowsCumSum_d[i], m_pparrRowsCumSum_h[i], (1 + m_parrQuantMtrx_h[i]) * sizeof(int), cudaMemcpyHostToDevice);
+		cudaMalloc(&m_pparrRowsCumSum_d[i], (1 + m_parrQuantMtrx[i]) * sizeof(int));
+		cudaMemcpy(m_pparrRowsCumSum_d[i], m_pparrRowsCumSum_h[i], (1 + m_parrQuantMtrx[i]) * sizeof(int), cudaMemcpyHostToDevice);
 	}
 
-	m_lenSt0 = (m_pparrRowsCumSum_h[0])[m_parrQuantMtrx_h[0]] * m_cols;
-	m_lenSt1 = (m_pparrRowsCumSum_h[1])[m_parrQuantMtrx_h[1]] * m_cols;
+	m_lenSt0 = (m_pparrRowsCumSum_h[0])[m_parrQuantMtrx[0]] * m_cols;
+	m_lenSt1 = (m_pparrRowsCumSum_h[1])[m_parrQuantMtrx[1]] * m_cols;
 	cudaMalloc(&m_arrOut0, m_lenSt0 * sizeof(fdmt_type_));
 	cudaMalloc(&m_arrOut1, m_lenSt1 * sizeof(fdmt_type_));
 }
@@ -271,17 +234,30 @@ void CFdmtGpu::process_image(fdmt_type_* d_parrImage       // on-device input im
 	, const bool b_ones
 )
 {	
+	int* d_mcols;
+	cudaMalloc((void**)&d_mcols, sizeof(int));
+	cudaMemcpy(d_mcols, &m_cols, sizeof(int), cudaMemcpyHostToDevice);
+
 	//auto start = std::chrono::high_resolution_clock::now();
+
+	int* parrQuantMtrx = NULL;
+	cudaMalloc((void**)&parrQuantMtrx, (1 + m_iNumIter) * sizeof(int));
+	cudaMemcpy(parrQuantMtrx, m_parrQuantMtrx, (1 + m_iNumIter) * sizeof(int), cudaMemcpyHostToDevice);
+	
+
 	const dim3 blockSize = dim3(1024, 1);
 	const dim3 gridSize = dim3((m_cols + blockSize.x - 1) / blockSize.x, m_nchan);
-	kernel_init_fdmt0 << < gridSize, blockSize >> > (d_parrImage, m_parrQuantMtrx_d[0], m_pcols_d, m_pparrRowsCumSum_d[0][1], m_arrOut0, b_ones);
+	kernel_init_fdmt0 << < gridSize, blockSize >> > (d_parrImage, m_parrQuantMtrx[0], d_mcols, m_pparrRowsCumSum_d[0][1], m_arrOut0, b_ones);
 	cudaDeviceSynchronize();
 
 	
 	//auto end = std::chrono::high_resolution_clock::now();
 	//auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 	//std::cout << "Time taken by function kernel_init_fdmt0: " << duration.count() << " microseconds" << std::endl;
+
 	
+
+
 	/*float* parr = (float*)malloc(m_nchan * m_cols*m_pparrRowsCumSum_h[0][1] * sizeof(float));
 	cudaMemcpy(parr, m_arrOut0, m_nchan * m_cols *  sizeof(float)
 		, cudaMemcpyDeviceToHost);
@@ -309,9 +285,9 @@ void CFdmtGpu::process_image(fdmt_type_* d_parrImage       // on-device input im
 	for (int iit = 1; iit < (m_iNumIter + 1); ++iit)	{
 		
 		const dim3 blockSize = dim3(1024, 1, 1);
-		const dim3 gridSize = dim3((m_cols + blockSize.x - 1) / blockSize.x, m_parrMaxQuantRows_h[iit], m_parrQuantMtrx_h[iit]);
-		kernel_fdmtIter_v1 << < gridSize, blockSize >> > (d_p0, m_pcols_d, m_parrQuantMtrx_d[iit-1], m_pparrRowsCumSum_d[iit - 1], m_pparrFreq_d[iit - 1]
-			, m_parrQuantMtrx_d[iit ], m_pparrRowsCumSum_d[iit], m_pparrFreq_d[iit], d_p1);
+		const dim3 gridSize = dim3((m_cols + blockSize.x - 1) / blockSize.x, m_parrMaxQuantRowsHost[iit], m_parrQuantMtrx[iit]);
+		kernel_fdmtIter_v1 << < gridSize, blockSize >> > (d_p0, d_mcols, parrQuantMtrx[iit-1], m_pparrRowsCumSum_d[iit - 1], m_pparrFreq_d[iit - 1]
+			, parrQuantMtrx[iit ], m_pparrRowsCumSum_d[iit], m_pparrFreq_d[iit], d_p1);
 		
 		cudaDeviceSynchronize();
 		float* parr1 = (float*)malloc(m_lenSt1 * sizeof(float));
@@ -337,6 +313,10 @@ void CFdmtGpu::process_image(fdmt_type_* d_parrImage       // on-device input im
 	}
 	auto end2 = clock();
 	auto duration2 = double(end2 - start2) / CLOCKS_PER_SEC;
+	
+	// ! 3
+	cudaFree(d_mcols);
+	cudaFree(parrQuantMtrx);
 }
 
 //----------------------------------------
@@ -398,7 +378,7 @@ size_t CFdmtGpu::calcSizeAuxBuff_fdmt_()
 	size_t temp = 0;
 	for (int i = 0; i < (m_iNumIter + 1); ++i)
 	{
-		temp += (1 + m_parrQuantMtrx_h[i]) * (sizeof(int) + sizeof(float));
+		temp += (1 + m_parrQuantMtrx[i]) * (sizeof(int) + sizeof(float));
 	}
 	size_t temp1 = (m_lenSt0 + m_lenSt1) * sizeof(fdmt_type_) + (m_iNumIter + 1) * (sizeof(int) + sizeof(float));
 	return temp + temp1;
@@ -457,7 +437,8 @@ unsigned long long ceil_power2__(const unsigned long long n)
 __device__
 double fnc_delay(const float fmin, const float fmax)
 {
-	return fdividef(1.0f, fmin * fmin) - fdividef(1.0f, fmax * fmax);	
+	return fdividef(1.0f, fmin * fmin) - fdividef(1.0f, fmax * fmax);
+	//1.0 / (fmin * fmin) - 1.0 / (fmax * fmax);
 }
 //---------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------
@@ -473,6 +454,7 @@ void kernel3D_Main_012_v1(fdmt_type_* d_parrInp, const int IDim0, const int IDim
 	, int* d_iarr_dT_ML, int* d_iarr_dT_RI, const int IOutPutDim0, const int IOutPutDim1
 	, fdmt_type_* d_parrOut)
 {	
+
 	int numElemInRow = blockIdx.x * blockDim.x + threadIdx.x;
 	if (numElemInRow >= IDim2)
 	{
@@ -552,6 +534,7 @@ void kernel3D_Main_012_v3(fdmt_type_* d_parrInp, const int IDim0, const int IDim
 	, const int IOutPutDim0, const int IOutPutDim1, fdmt_type_* d_parrOut)
 {
 	extern __shared__ int sh_iarr[6];
+
 	int i_F = blockIdx.z;
 	int i_dT = blockIdx.y;
 	int idT_middle_index, idT_middle_larger, idT_rest_index;
@@ -564,6 +547,7 @@ void kernel3D_Main_012_v3(fdmt_type_* d_parrInp, const int IDim0, const int IDim
 	sh_iarr[4] = idT_middle_larger;
 	sh_iarr[5] = (2 * i_F + 1) * IDim1 * IDim2 + idT_rest_index * IDim2 - idT_middle_larger;
 	__syncthreads();
+
 
 	int numElemInRow = blockIdx.x * blockDim.x + threadIdx.x;
 	if (sh_iarr[0] > sh_iarr[1])
@@ -702,7 +686,7 @@ void kernel_2d_arrays(const int IDim0, const int IDim1
 	d_iarr_dT_rest_index[i] = i_dT - ivalt;
 }
 //-----------------------------------------------------------------------------
-
+//void CFdmtGpu::upload_to_CPU
 
 
 

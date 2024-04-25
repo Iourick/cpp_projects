@@ -26,7 +26,7 @@ public:
 	// configuration params:
 	int** m_pparrRowsCumSum_h;
 	float** m_pparrFreq_h;
-	int* m_parrQuantMtrx_h;
+	int* m_parrQuantMtrx;
 	int m_iNumIter;
 
 	virtual void process_image(fdmt_type_* piarrImgInp, fdmt_type_* piarrImgOut, const bool b_ones);

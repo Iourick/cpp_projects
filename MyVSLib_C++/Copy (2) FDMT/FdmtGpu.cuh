@@ -35,15 +35,13 @@ public:
 	// we will store in this array maximal quantity of rows of submatrices for each iteration, including initialization.
 	// So, m_parrMaxQuantRowsHost[i] = pparrRowsCumSum[i][1]
 	//int* m_parrQuantMtrxHost;
-	int* m_parrMaxQuantRows_h;
+	int* m_parrMaxQuantRowsHost;
 
 	/*int16_t* m_parr_j0;
 	int16_t* m_parr_j1;*/
 	// configuration params on device:
 	int** m_pparrRowsCumSum_d;
 	float** m_pparrFreq_d;
-	int* m_parrQuantMtrx_d;
-	int* m_pcols_d;// =m_cols, only on GPU
 	
 
 
