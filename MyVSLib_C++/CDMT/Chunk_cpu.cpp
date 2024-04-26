@@ -425,7 +425,7 @@ void CChunk_cpu::compute_chirp_channel(std::vector<std::complex<float>>* parr_dc
 				for (int isft = 0; isft < m_len_sft; ++isft)
 				{
 					double temp0 = arr_freqs_chan[ichan * m_len_sft + isft];
-					int i0 = idm * m_nchan * m_len_sft * mbin + ichan * m_len_sft * mbin + +isft * mbin;				
+					int i0 = idm * m_nchan * m_len_sft * mbin + ichan * m_len_sft * mbin + isft * mbin;				
 					for (int ibin = 0; ibin < mbin; ++ibin)
 					{
 						double temp1 = arr_bin_freqs[ibin] / temp0;

@@ -74,7 +74,7 @@ public:
 		, void** ppAuxBuff_fdmt, fdmt_type_** d_parrfdmt_norm, cufftComplex** ppcarrTemp, cufftComplex** ppcarrCD_Out
 		, cufftComplex** ppcarrBuff, char** ppInpOutBuffFdmt,  CChunk_gpu** ppChunk);
 
-	void compute_chirp_channel();
+	virtual void compute_chirp_channel();
 
 	void create_fft_plans();
 
@@ -96,8 +96,8 @@ __global__
 void  element_wise_cufftComplex_mult_kernel(cufftComplex* d_arrOut, cufftComplex* d_arrInp0, cufftComplex* d_arrInp1
 	, int npol, int nfft, int dim2);
 
-__global__
-void element_wise_cufftComplex_mult_kernel(cufftComplex* data, long long element_count, float scale);
+//__global__
+//void element_wise_cufftComplex_mult_kernel(cufftComplex* data, long long element_count, float scale);
 
 __global__ void  divide_cufftComplex_array_kernel(cufftComplex* d_arr, int len, float val);
 

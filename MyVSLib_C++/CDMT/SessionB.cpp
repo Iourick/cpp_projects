@@ -225,6 +225,8 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
                 size_t shift = calc_ShiftingBytes(QUantChunkBytes);
                 shift_file_pos(prb_File, -shift);
             }
+
+
            int ibytes = download_chunk(prb_File, (char*)parrInput, QUantChunkBytes);
 
             if (j != (NumChunks - 1))
@@ -238,7 +240,7 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
            (*ppChunk)->process(pcmparrRawSignalCur, m_pvctSuccessHeaders, pvecImg);
 
            // TEMPORARY FOR DEBUGGING LOFAR ONLY! DELETE LATER!
-           break;          
+         // break;          
         }
         *pmsamp = (*ppChunk)-> get_msamp();        
 

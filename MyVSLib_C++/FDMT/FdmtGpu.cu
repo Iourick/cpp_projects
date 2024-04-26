@@ -14,6 +14,9 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include "yr_cart.h"
+
+cudaError_t cudaStatus1;
+
 CFdmtGpu::~CFdmtGpu() 
 {
 	if (m_pparrFreq_d !=NULL)
@@ -277,7 +280,11 @@ void CFdmtGpu::process_image(fdmt_type_* d_parrImage       // on-device input im
 	kernel_init_fdmt0 << < gridSize, blockSize >> > (d_parrImage, m_parrQuantMtrx_d[0], m_pcols_d, m_pparrRowsCumSum_d[0][1], m_arrOut0, b_ones);
 	cudaDeviceSynchronize();
 
-	
+	cudaStatus1 = cudaGetLastError();
+	if (cudaStatus1 != cudaSuccess) {
+		fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus1));
+		return ;
+	}
 	//auto end = std::chrono::high_resolution_clock::now();
 	//auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 	//std::cout << "Time taken by function kernel_init_fdmt0: " << duration.count() << " microseconds" << std::endl;
@@ -311,14 +318,14 @@ void CFdmtGpu::process_image(fdmt_type_* d_parrImage       // on-device input im
 		const dim3 blockSize = dim3(1024, 1, 1);
 		const dim3 gridSize = dim3((m_cols + blockSize.x - 1) / blockSize.x, m_parrMaxQuantRows_h[iit], m_parrQuantMtrx_h[iit]);
 		kernel_fdmtIter_v1 << < gridSize, blockSize >> > (d_p0, m_pcols_d, m_parrQuantMtrx_d[iit-1], m_pparrRowsCumSum_d[iit - 1], m_pparrFreq_d[iit - 1]
-			, m_parrQuantMtrx_d[iit ], m_pparrRowsCumSum_d[iit], m_pparrFreq_d[iit], d_p1);
+			, m_parrQuantMtrx_d[iit ], m_pparrRowsCumSum_d[iit], m_pparrFreq_d[iit], d_p1);		
+		cudaDeviceSynchronize();
 		
-		cudaDeviceSynchronize();
-		float* parr1 = (float*)malloc(m_lenSt1 * sizeof(float));
-		cudaMemcpy(parr1, d_p1, m_lenSt1 * sizeof(float)	, cudaMemcpyDeviceToHost);
-		cudaDeviceSynchronize();
-		int uu = 0;
-		delete[]parr1;
+		cudaStatus1 = cudaGetLastError();
+		if (cudaStatus1 != cudaSuccess) {
+			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus1));
+			return;
+		}
 
 		if (iit == m_iNumIter)
 		{

@@ -13,6 +13,8 @@
 #include <cufft.h>
 #include "ChunkB.h"
 #include "Chunk_gpu.cuh"
+#include "Chunk_v1_gpu.cuh"
+#include "Chunk_py_gpu.cuh"
 #include "npy.hpp"
 
 cudaError_t cudaStatus;
@@ -54,7 +56,7 @@ CSession_lofar_gpu::CSession_lofar_gpu(const char* strGuppiPath, const char* str
 
 bool  CSession_lofar_gpu::unpack_chunk(const long long LenChunk, const int Noverlap, inp_type_* d_parrInput, void* pcmparrRawSignalCur)
 {
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
 
     cudaStatus = cudaGetLastError();
     if (cudaStatus != cudaSuccess) {
@@ -111,7 +113,7 @@ void CSession_lofar_gpu::createChunk(CChunkB** ppchunk
     , const float tsamp)
 {
    
-        CChunk_gpu* chunk = new CChunk_gpu(Fmin
+        CChunk_gpu* chunk = new CChunk_py_gpu(Fmin
             , Fmax
             , npol
             , nchan           
@@ -127,7 +129,17 @@ void CSession_lofar_gpu::createChunk(CChunkB** ppchunk
             , nfft
             , noverlap
            , tsamp);
+        cudaStatus = cudaGetLastError();
+        if (cudaStatus != cudaSuccess) {
+            fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
+            return;
+        }
     *ppchunk = chunk;
+    cudaStatus = cudaGetLastError();
+    if (cudaStatus != cudaSuccess) {
+        fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
+        return ;
+    }
 }
 
 //-----------------------------------------------------------------------
