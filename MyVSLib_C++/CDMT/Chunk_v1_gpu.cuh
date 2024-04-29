@@ -67,8 +67,14 @@ __global__
 void kernel_create_arr_dc1(cufftComplex* parr_dc, double* parrcoh_dm, double* parr_freqs_chan, double* parr_bin_freqs, double* parr_taper
 	, int ndm, int nchan, int len_sft, int mbin);
 
-
 __global__ void transpose_(float* odata, float* idata, int width, int height);
+
+__global__ void roll_rows_normalize_sum_kernel(float* arr_rez, cufftComplex* arr, const int npol, const int rows
+	, const  int cols, const  int shift);
+
+__global__
+void  transpose_unpadd_intensity(float* fbuf, float* arin, int nfft, int noverlap_per_channel
+	, int mbin_adjusted, const int nchan, const int nlen_sft, int mbin);
 
 
 

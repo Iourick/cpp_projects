@@ -4,7 +4,9 @@
 #include "npy.hpp"
 #include <algorithm>
 #include <vector>
+#include <complex>
 
+using namespace std;
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -152,6 +154,8 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 	const int mchan = m_nchan * m_len_sft;
 	// 1!
 	
+	
+
 	// 2. Forward FFT execution
 	fftwf_cleanup();
 	fftw_import_wisdom_from_string(m_str_wis_forw);
@@ -162,9 +166,12 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 	fftwf_destroy_plan(plan);
 	//2!	
 	
+	
 	//3. roll and normalize ffted signals
 	fnc_roll_and_normalize_ffted((fftwf_complex*)pcmparrRawSignalCur, m_nchan * m_npol / 2 * m_nfft, m_nbin);
 	//3!
+
+	
 
 	// 4. memory allocation for buffers
 	fftwf_complex*  parrElemWiseMulted = (fftwf_complex*)fftw_malloc(sizeof(fftwf_complex) * m_nchan * m_npol / 2 * m_nfft * m_nbin);
@@ -228,9 +235,18 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 		}
 		// 7!
 
-		//8. roll and normalize ffted signals
+		
+
+		//8. roll ffted signals
 		fnc_roll_ffted(parrElemWiseMulted, m_nchan * m_npol / 2 * m_len_sft* m_nfft, m_nbin/ m_len_sft);
-		//8!		
+		//8!	
+		
+		/*int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;
+		std::vector<complex<float>> data4(lenarr4, 0);
+		memcpy(data4.data(), (fftwf_complex*)parrElemWiseMulted, lenarr4 * sizeof(std::complex<float>));
+		std::array<long unsigned, 1> leshape2{ lenarr4 };
+		npy::SaveArrayAsNumpy("pcmparrRawSignalFfted_cpu.npy", false, leshape2.size(), leshape2.data(), data4);
+		int ii = 0;*/
 		
 		// 9. SFFT
 		fftwf_cleanup();
@@ -242,6 +258,8 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 		fftwf_destroy_plan(plan);
 		// 9!
 		
+		
+
 		// 10. normalization of parrElemWiseMulted,
 		float coef = 1.0f / ((float)n);
 #pragma omp parallel //
@@ -262,7 +280,12 @@ bool CChunk_cpu::process(void* pcmparrRawSignalCur
 		/*transpose_unpadd(parrElemWiseMulted,  fbuf);
 		transpose_unpadd(parrElemWiseMulted + m_nchan * m_nfft * m_nbin,  fbuf + msamp * m_nchan * m_len_sft);*/
 		// 11!
-		
+		int lenarr4 = msamp * m_nchan * m_len_sft;
+		std::vector<complex<float>> data4(lenarr4, 0);
+		memcpy(data4.data(), fbuf, lenarr4 * sizeof(std::complex<float>));
+		std::array<long unsigned, 1> leshape2{ lenarr4 };
+		npy::SaveArrayAsNumpy("pcmparrRawSignalFfted_cpu.npy", false, leshape2.size(), leshape2.data(), data4);
+		int ii = 0;
 		//12. calc intensity matrix already transposed
 		
 		memset(parr_wfall, 0, sizeof(float) * msamp * m_nchan * m_len_sft);
@@ -355,6 +378,7 @@ void CChunk_cpu::fnc_dedisperse(float* parr_wfall, const float dm, const float  
 			double temp = (double)(nchans - 1 - i) * foff + f_min;
 			double temp1 = 4.148808e3 * dm * (1.0 / (f_min * f_min) - 1.0 / (temp * temp));
 			int ishift = round(temp1 / tsamp);
+			ishift = ishift % msamp;
 			roll_(parr_wfall + i * msamp, msamp, ishift);
 		}
 	}	

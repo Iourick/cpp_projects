@@ -240,7 +240,11 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
            (*ppChunk)->process(pcmparrRawSignalCur, m_pvctSuccessHeaders, pvecImg);
 
            // TEMPORARY FOR DEBUGGING LOFAR ONLY! DELETE LATER!
-         // break;          
+           if (0== j)
+           {
+              break;
+           }
+               
         }
         *pmsamp = (*ppChunk)-> get_msamp();        
 

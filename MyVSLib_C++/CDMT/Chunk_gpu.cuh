@@ -48,6 +48,15 @@ public:
 	cufftHandle m_fftPlanInverse;
 
 	CFdmtGpu m_Fdmt;
+
+	//cufftComplex  buffer to store element wize multed array
+	cufftComplex* m_pdcmpbuff_ewmulted;
+
+	// buffer to store rolled array
+	float* m_pdbuff_rolled;
+
+	// buffer to accumulate fdmt outputs
+	float* m_pdoutImg;
 	
 
 	//-------------------------------------------------------------------------
@@ -93,6 +102,9 @@ __global__
 void roll_rows_and_normalize_kernel(cufftComplex* arr_rez, cufftComplex* arr, int rows, int cols, int shift);
 
 __global__ 
+void roll_rows_kernel(cufftComplex* arr_rez, cufftComplex* arr, int rows, int cols, int shift);
+
+__global__ 
 void  element_wise_cufftComplex_mult_kernel(cufftComplex* d_arrOut, cufftComplex* d_arrInp0, cufftComplex* d_arrInp1
 	, int npol, int nfft, int dim2);
 
@@ -105,7 +117,7 @@ __global__
 void calc_intensity_kernel(float *intensity, const int len, const int npol, cufftComplex* fbuf);
 
 __global__
-void  transpose_unpadd(cufftComplex* fbuf, cufftComplex* arin, int nfft, int noverlap_per_channel
+void  transpose_unpadd_kernel(cufftComplex* fbuf, cufftComplex* arin, int nfft, int noverlap_per_channel
 	, int mbin_adjusted, const int nchan, const int nlen_sft, int mbin);
 
 __global__ void transpose(float* odata, float* idata, int width, int height);

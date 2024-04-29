@@ -239,10 +239,8 @@ void kernel_create_arr_dc(cufftComplex* parr_dc, double* parrcoh_dm, double* par
 		return;
 	}
 
-
 	float temp0 = parr_freqs_chan[ichan * len_sft + isft];
 	int i0 = idm * nchan * len_sft * mbin + ichan * len_sft * mbin + isft * mbin;
-
 
 	double temp1 = parr_bin_freqs[ibin] / temp0;
 	double phase_delay = (parrcoh_dm[idm] * temp1 * temp1 / (temp0 + parr_bin_freqs[ibin]) * 4.148808e9);
@@ -253,7 +251,6 @@ void kernel_create_arr_dc(cufftComplex* parr_dc, double* parrcoh_dm, double* par
 	sincospi(t, &val_y, &val_x);
 	parr_dc[i0 + ibin].x = float(val_x * parr_taper[ibin]);
 	parr_dc[i0 + ibin].y = float(val_y * parr_taper[ibin]);
-
 }
 
 //---------------------------------------------------
@@ -267,11 +264,6 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 	const int msamp = get_msamp();
 	const int mchan = m_nchan * m_len_sft;
 	// 1!
-
-	// 2. Forward FFT execution
-	checkCudaErrors(cufftExecC2C(m_fftPlanForward, (cufftComplex*)pcmparrRawSignalCur, (cufftComplex*)pcmparrRawSignalCur, CUFFT_FORWARD));
-	//2!	
-
 	//int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
 	//std::vector<complex<float>> data4(lenarr4, 0);
 	//cudaMemcpy(data4.data(), (cufftComplex*)pcmparrRawSignalCur, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
@@ -279,17 +271,29 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 	//std::array<long unsigned, 1> leshape2{ lenarr4 };
 	//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
 	//int ii = 0;
+	// 2. Forward FFT execution
+	checkCudaErrors(cufftExecC2C(m_fftPlanForward, (cufftComplex*)pcmparrRawSignalCur, m_pdcmpbuff_ewmulted, CUFFT_FORWARD));
+	//2!	
+	
+	
 
 	//3. roll and normalize ffted signals
 	dim3 treads_per_block(256, 1);
 	dim3 blocks_per_grid((m_nbin + treads_per_block.x - 1) / treads_per_block.x, m_nfft * m_nchan * m_npol / 2);
 
-	cufftComplex* pcmparrRawSignalRolled = NULL;
-	cudaMalloc(&pcmparrRawSignalRolled, m_nfft * m_nchan * m_npol / 2 * m_nbin * sizeof(cufftComplex));
+	//cufftComplex* pcmparrRawSignalRolled = NULL;
+	//cudaMalloc(&pcmparrRawSignalRolled, m_nfft * m_nchan * m_npol / 2 * m_nbin * sizeof(cufftComplex));
 	dim3 threads(1024, 1);
 	dim3 blocks((m_nbin + threads.x - 1) / threads.x, m_nfft * m_nchan * m_npol / 2);
-	roll_rows_and_normalize_kernel << < blocks, threads >> > (pcmparrRawSignalRolled, (cufftComplex*)pcmparrRawSignalCur, m_nfft * m_nchan * m_npol / 2, m_nbin, m_nbin / 2);
+	roll_rows_and_normalize_kernel << < blocks, threads >> > ((cufftComplex*)pcmparrRawSignalCur, m_pdcmpbuff_ewmulted, m_nfft * m_nchan * m_npol / 2, m_nbin, m_nbin / 2);
 
+	cudaStatus0 = cudaGetLastError();
+	if (cudaStatus0 != cudaSuccess) {
+		fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
+		return false;
+	}
+
+	
 	cudaStatus0 = cudaGetLastError();
 	if (cudaStatus0 != cudaSuccess) {
 		fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
@@ -306,25 +310,35 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 
 	//3!
 
-	float* poutImg = NULL;
-	cudaMalloc(&poutImg, msamp * m_len_sft * m_coh_dm_Vector.size() * sizeof(float));
+	//float* poutImg = NULL;
+	//cudaMalloc(&poutImg, msamp * m_len_sft * m_coh_dm_Vector.size() * sizeof(float));
 	for (int idm = 0; idm < m_coh_dm_Vector.size(); ++idm)
 	{
 		dim3 threadsPerBlock(1024, 1, 1);
 		dim3 blocksPerGrid((m_nchan * m_nbin + threadsPerBlock.x - 1) / threadsPerBlock.x, m_nfft, m_npol / 2);
 		element_wise_cufftComplex_mult_kernel << < blocksPerGrid, threadsPerBlock >> >
-			((cufftComplex*)pcmparrRawSignalCur, pcmparrRawSignalRolled, &m_pd_arr_dc[m_nchan * m_nbin * idm], m_npol / 2, m_nfft, m_nchan * m_nbin);
+			(m_pdcmpbuff_ewmulted,(cufftComplex*)pcmparrRawSignalCur, &m_pd_arr_dc[m_nchan * m_nbin * idm], m_npol / 2, m_nfft, m_nchan * m_nbin);
 		cudaDeviceSynchronize();
-
+		// result stored in m_pdcmpbuff_ewmulted
 		cudaStatus0 = cudaGetLastError();
 		if (cudaStatus0 != cudaSuccess) {
 			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
 			return false;
 		}
+
+		//int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
+		//std::vector<complex<float>> data4(lenarr4, 0);
+		//cufftComplex* pc = &pcmparrRawSignalRolled[lenarr4];
+		//cudaMemcpy(data4.data(), (cufftComplex*)pcmparrRawSignalCur, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+		//cudaDeviceSynchronize();
+		//std::array<long unsigned, 1> leshape2{ lenarr4 };
+		//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+		//int ii = 0;
+
 		int threads1 = 1024;
 		int blocks1 = (m_npol / 2 * m_nfft * m_nchan * m_nbin + threads1 - 1) / threads1;
-		divide_cufftComplex_array_kernel << <blocks1, threads1 >> > ((cufftComplex*)pcmparrRawSignalCur, m_npol / 2 * m_nfft * m_nchan * m_nbin, ((float)m_nbin));
-		cudaDeviceSynchronize();
+		/*divide_cufftComplex_array_kernel << <blocks1, threads1 >> > ((cufftComplex*)pcmparrRawSignalCur, m_npol / 2 * m_nfft * m_nchan * m_nbin, ((float)m_nbin));
+		cudaDeviceSynchronize();*/
 
 		cudaStatus0 = cudaGetLastError();
 		if (cudaStatus0 != cudaSuccess) {
@@ -344,9 +358,10 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 		int mbin = get_mbin();
 		dim3 threads(256, 1);
 		dim3 blocks((mbin + threads.x - 1) / threads.x, m_nfft * m_nchan * m_npol / 2 * m_len_sft);
-		roll_rows_and_normalize_kernel << < blocks, threads >> > (pcmparrRawSignalRolled1, (cufftComplex*)pcmparrRawSignalCur, m_nfft * m_nchan * m_npol / 2 * m_len_sft, mbin, mbin / 2);
+		// result stored in m_pdcmpbuff_ewmulted
+		roll_rows_kernel << < blocks, threads >> > (pcmparrRawSignalRolled1, m_pdcmpbuff_ewmulted, m_nfft * m_nchan * m_npol / 2 * m_len_sft, mbin, mbin / 2);
 		cudaDeviceSynchronize();
-
+		// result stored in pcmparrRawSignalRolled1. m_pdcmpbuff_ewmulted is free
 		cudaStatus0 = cudaGetLastError();
 		if (cudaStatus0 != cudaSuccess) {
 			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
@@ -361,23 +376,16 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 		int ii = 0;*/
 
 		checkCudaErrors(cufftExecC2C(m_fftPlanInverse, pcmparrRawSignalRolled1, pcmparrRawSignalRolled1, CUFFT_INVERSE));
-
+		// result stored in pcmparrRawSignalRolled1. m_pdcmpbuff_ewmulted is free
 		cudaStatus0 = cudaGetLastError();
 		if (cudaStatus0 != cudaSuccess) {
 			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
 			return false;
-		}
-		//checkCudaErrors(cufftExecC2C(m_fftPlanInverse, (cufftComplex*)pcmparrRawSignalCur, (cufftComplex*)pcmparrRawSignalCur, CUFFT_INVERSE));
-		//int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;// *sizeof(cufftComplex));
-		//std::vector<complex<float>> data4(lenarr4, 0);
-		//cudaMemcpy(data4.data(), pcmparrRawSignalRolled1, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
-		//cudaDeviceSynchronize();
-		//std::array<long unsigned, 1> leshape2{ lenarr4 };
-		//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
-		//int ii = 0;
+		}		
+		
 
 		blocks1 = (m_nfft * m_nchan * m_npol / 2 * m_nbin + threads1 - 1) / threads1;
-		divide_cufftComplex_array_kernel << <blocks1, threads1 >> > (pcmparrRawSignalRolled1, m_nfft * m_nchan * m_npol / 2 * m_nbin, ((float)mbin));
+		//divide_cufftComplex_array_kernel << <blocks1, threads1 >> > (pcmparrRawSignalRolled1, m_nfft * m_nchan * m_npol / 2 * m_nbin, ((float)mbin));
 		cudaDeviceSynchronize();
 
 		cudaStatus0 = cudaGetLastError();
@@ -396,14 +404,16 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 
 		int noverlap_per_channel = get_noverlap_per_channel();
 		int mbin_adjusted = get_mbin_adjusted();
-		void* fbuf = NULL;
-		cudaMalloc(&fbuf, mbin_adjusted * m_nfft * m_nchan * m_len_sft * m_npol / 2 * sizeof(cufftComplex));
+		cufftComplex* fbuf = m_pdcmpbuff_ewmulted;
+		//cudaMalloc(&fbuf, mbin_adjusted * m_nfft * m_nchan * m_len_sft * m_npol / 2 * sizeof(cufftComplex));
 		//void* fbuf = (cufftComplex*)pcmparrRawSignalCur;
 
+
+		// result stored in pcmparrRawSignalRolled1. m_pdcmpbuff_ewmulted is free
 		dim3 threads_per_block1(1024, 1, 1);
 		dim3 blocks_per_grid1((mbin_adjusted + threads_per_block1.x - 1) / threads_per_block1.x, m_nchan * m_len_sft, m_nfft * m_npol / 2);
-		transpose_unpadd << < blocks_per_grid1, threads_per_block1 >> >
-			((cufftComplex*)fbuf, pcmparrRawSignalRolled1, m_nfft, noverlap_per_channel
+		transpose_unpadd_kernel << < blocks_per_grid1, threads_per_block1 >> >
+			(fbuf, pcmparrRawSignalRolled1, m_nfft, noverlap_per_channel
 				, mbin_adjusted, m_nchan, m_len_sft, mbin);
 
 		cudaStatus0 = cudaGetLastError();
@@ -411,8 +421,17 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
 			return false;
 		}
-
+		// result stored in m_pdcmpbuff_ewmulted (=fbuf).   pcmparrRawSignalRolled1 is free
+		int lenarr4 = msamp * m_nchan * m_len_sft;// *sizeof(cufftComplex));
+		std::vector<complex<float>> data4(lenarr4, 0);
+		cudaMemcpy(data4.data(), (cufftComplex*)fbuf, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
+		cudaDeviceSynchronize();
+		std::array<long unsigned, 1> leshape2{ lenarr4 };
+		npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
+		int ii = 0;
 	
+
+		// result stored in m_pdcmpbuff_ewmulted (=fbuf).   pcmparrRawSignalRolled1 is free
 		float* parr_wfall = (float*)pcmparrRawSignalRolled1;
 
 		// 
@@ -422,6 +441,7 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 		calcPowerMtrx_kernel << <  chunkPerGrid, threadsPerChunk >> > (parr_wfall, msamp, m_nchan * m_len_sft, m_npol, (cufftComplex*)fbuf);
 
 		cudaDeviceSynchronize();
+		// result stored in pcmparrRawSignalRolled1.   m_pdcmpbuff_ewmulted  is free
 		cudaStatus0 = cudaGetLastError();
 		if (cudaStatus0 != cudaSuccess) {
 			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
@@ -435,8 +455,8 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 		npy::SaveArrayAsNumpy("parr_wfall_gpu.npy", false, leshape2.size(), leshape2.data(), data4);
 		int ii = 0;*/
 
-
-		float* parr_wfall_disp = (float*)pcmparrRawSignalCur;
+		// result stored in pcmparrRawSignalRolled1 (=parr_wfall.   m_pdcmpbuff_ewmulted  is free
+		float* parr_wfall_disp = (float*)m_pdcmpbuff_ewmulted;
 		double val_tsamp_wfall = m_len_sft * m_tsamp;
 		double val_dm = m_coh_dm_Vector[idm];
 		double f0 = ((double)m_Fmax - (double)m_Fmin) / (m_nchan * m_len_sft);
@@ -459,7 +479,7 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 		npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
 		int ii = 0;*/
 
-		m_Fdmt.process_image(parr_wfall_disp, &poutImg[idm * msamp * m_len_sft], false);
+		m_Fdmt.process_image(parr_wfall_disp, &m_pdoutImg[idm * msamp * m_len_sft], false);
 
 		cudaStatus0 = cudaGetLastError();
 		if (cudaStatus0 != cudaSuccess) {
@@ -467,7 +487,7 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 			return false;
 		}
 		cudaFree(pcmparrRawSignalRolled1);
-		cudaFree(fbuf);
+		//cudaFree(fbuf);
 
 		cudaStatus0 = cudaGetLastError();
 		if (cudaStatus0 != cudaSuccess) {
@@ -498,10 +518,10 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 	}
 	for (int i = 0; i < m_coh_dm_Vector.size(); ++i)
 	{
-		cudaMemcpy(pvecImg_temp->at(i).data(), &poutImg[i * msamp * m_len_sft], msamp * m_len_sft * sizeof(float), cudaMemcpyDeviceToHost);
+		cudaMemcpy(pvecImg_temp->at(i).data(), &m_pdoutImg[i * msamp * m_len_sft], msamp * m_len_sft * sizeof(float), cudaMemcpyDeviceToHost);
 	}
-	checkCudaErrors(cudaFree(pcmparrRawSignalRolled));
-	checkCudaErrors(cudaFree(poutImg));
+	//checkCudaErrors(cudaFree(pcmparrRawSignalRolled));
+	//checkCudaErrors(cudaFree(poutImg));
 	return true;
 }
 		

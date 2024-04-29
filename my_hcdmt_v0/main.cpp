@@ -46,8 +46,8 @@ double valD_max = 50.0;
 double length_of_pulse = 5.12E-6 * 32.0;//;
 float sigma_Bound = 12.;
 int lenWindow = 1;
-int nbin = 262144;
-int nfft = 1;
+int nbin = 262144 ;
+int nfft =1;
 /*************** ! DATA FOR LOFAR *****************************/
 
 

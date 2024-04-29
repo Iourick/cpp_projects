@@ -113,7 +113,7 @@ void CSession_lofar_gpu::createChunk(CChunkB** ppchunk
     , const float tsamp)
 {
    
-        CChunk_gpu* chunk = new CChunk_py_gpu(Fmin
+        CChunk_gpu* chunk = new CChunk_v1_gpu(Fmin
             , Fmax
             , npol
             , nchan           
