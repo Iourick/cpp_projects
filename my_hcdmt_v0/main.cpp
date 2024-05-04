@@ -26,70 +26,50 @@
 #include "Fragment.h"
 #include "Session_lofar_cpu.h"
 #include "Session_lofar_gpu.cuh"
+#include "Session_guppi_cpu.h"
+#include "Session_guppi_gpu.cuh"
 
 #define _CRT_SECURE_NO_WARNINGS
 using namespace std;
-using namespace std;
+
 
 
 
 /************** DATA FOR LOFAR ****************************/
-char PathInpFile[] = "D://BASSA//hdf5_data//L2012176_SAP000_B000_S0_P001_bf.h5";
-char PathOutFold[] = "OutPutFold";
-TYPE_OF_INP_FORMAT INP_FORMAT = FLOFAR;
-TYPE_OF_PROCESSOR PROCESSOR = GPU;
-
-char* pPathInpFile = PathInpFile;
-char* pPathOutFold = PathOutFold;
-double valD_min = 30.0;
-double valD_max = 50.0;
-double length_of_pulse = 5.12E-6 * 32.0;//;
-float sigma_Bound = 12.;
-int lenWindow = 1;
-int nbin = 262144 ;
-int nfft =10;
+//char PathInpFile[] = "D://BASSA//hdf5_data//L2012176_SAP000_B000_S0_P001_bf.h5";
+//char PathOutFold[] = "OutPutFold";
+//TYPE_OF_INP_FORMAT INP_FORMAT = FLOFAR;
+//TYPE_OF_PROCESSOR PROCESSOR = CPU;
+//
+//char* pPathInpFile = PathInpFile;
+//char* pPathOutFold = PathOutFold;
+//double valD_min = 30.0;
+//double valD_max = 50.0;
+//double length_of_pulse = 5.12E-6 * 32.0;//;
+//float sigma_Bound = 12.;
+//int lenWindow = 1;
+//int nbin = 262144 ;
+//int nfft =10;
 /*************** ! DATA FOR LOFAR *****************************/
 
 
 /***************   GUPPI ********************************************/
- //char PathInpFile[] = "D://weizmann//RAW_DATA//blc20_guppi_57991_49905_DIAG_FRB121102_0011.0007.raw";
- //char PathOutFold[] = "OutPutFold";
- //char* pPathInpFile = PathInpFile;
- //char* pPathOutFold = PathOutFold;
- //TYPE_OF_INP_FORMAT INP_FORMAT = GUPPI;
- //double valD_max = 96.73;
- //double length_of_pulse = 1.36E-6;
- //float sigma_Bound =12.;
- //int lenWindow = 10;
-// int lenChunk = 32768;
+ char PathInpFile[] = "D://weizmann//RAW_DATA//blc20_guppi_57991_49905_DIAG_FRB121102_0011.0007.raw";
+ char PathOutFold[] = "OutPutFold";
+ 
+ TYPE_OF_INP_FORMAT INP_FORMAT = GUPPI;
+  TYPE_OF_PROCESSOR PROCESSOR = CPU;
+  char* pPathInpFile = PathInpFile;
+  char* pPathOutFold = PathOutFold;
+  double valD_min = 30.0;
+  double valD_max = 50.0;
+  double length_of_pulse = 3.41333333E-7 * 32.0;//;
+  float sigma_Bound = 12.;
+  int lenWindow = 1;
+  int nbin = 262144 ;
+  int nfft =10;
 /*************** !  GUPPI ********************************************/
 
-
-/***************  TEST FOR GUPPI  nchan =1, npol = 2 ********************************************/
-// char PathInpFile[] = "D://weizmann//RAW_DATA//rawImit_2pow20_nchan_1npol_2_float_.bin";//40.0E-8
-// char PathOutFold[] = "OutPutFold";
-//char* pPathInpFile = PathInpFile;
-//char* pPathOutFold = PathOutFold;
-//TYPE_OF_INP_FORMAT INP_FORMAT = GUPPI;
-// double valD_max =  1.5;
-// double length_of_pulse = 3.2E-7;
-// float sigma_Bound = 100.0;
-// int lenWindow = 10;
-// int lenChunk = 32768;
-/*************** ! TEST FOR GUPPI ********************************************/
-
-
-     /***************  TEST FOR GUPPI  nchan =2, npol = 4 ********************************************/
-     // char PathInpFile[] = "D://weizmann//RAW_DATA//rawImit_2pow20_nchan_2npol_4_float_.bin";//40.0E-8
-     // char PathOutFold[] = "OutPutFold";
-     //char* pPathInpFile = PathInpFile;
-     //char* pPathOutFold = PathOutFold;
-     //TYPE_OF_INP_FORMAT INP_FORMAT = GUPPI;
-     // double valD_max =  1.5;
-     // double length_of_pulse = 3.2E-7;
-     // float sigma_Bound = 100.0;
-     // int lenWindow = 10;
-// int lenChunk = 32768;
 
      /*************** ! TEST FOR GUPPI ********************************************/
 
@@ -116,29 +96,45 @@ bool launch_file_processing(TYPE_OF_PROCESSOR PROCESSOR, TYPE_OF_INP_FORMAT INP_
    
     CSession_lofar_cpu* pSess_lofar_cpu = nullptr;
     CSession_lofar_gpu* pSess_lofar_gpu = nullptr;
+    CSession_guppi_cpu* pSess_guppi_cpu = nullptr;
+    CSession_guppi_gpu* pSess_guppi_gpu = nullptr;
     switch (INP_FORMAT)
     {
-    case GUPPI:
-        // pSess_guppi = new CSession_gpu_guppi(pPathInpFile, pPathOutFold, length_of_pulse, valD_max, sigma_Bound, lenWindow,lenChunk);
-        // pSession = pSess_guppi;
-        break;
+        case GUPPI:
+            switch (PROCESSOR)
+            {
+            case CPU:
+                pSess_guppi_cpu = new CSession_guppi_cpu(pPathInpFile, pPathOutFold, length_of_pulse
+                    , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
+                pSession = pSess_guppi_cpu;
+                break;
 
-    case FLOFAR:
-        switch (PROCESSOR)
-        {
-        case CPU:
-            pSess_lofar_cpu = new CSession_lofar_cpu(pPathInpFile, pPathOutFold, length_of_pulse
-                , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
-            pSession = pSess_lofar_cpu;
+            case GPU:
+                pSess_guppi_gpu = new CSession_guppi_gpu(pPathInpFile, pPathOutFold, length_of_pulse
+                    , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
+                pSession = pSess_guppi_gpu;
+                break;
+            default: break;
+            }
+                 
             break;
 
-        case GPU:
-            pSess_lofar_gpu = new CSession_lofar_gpu(pPathInpFile, pPathOutFold, length_of_pulse
-                , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
-            pSession = pSess_lofar_gpu;
-            break;
-        default: break;
-        }       
+        case FLOFAR:
+            switch (PROCESSOR)
+            {
+                case CPU:
+                    pSess_lofar_cpu = new CSession_lofar_cpu(pPathInpFile, pPathOutFold, length_of_pulse
+                        , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
+                    pSession = pSess_lofar_cpu;
+                    break;
+
+                case GPU:
+                    pSess_lofar_gpu = new CSession_lofar_gpu(pPathInpFile, pPathOutFold, length_of_pulse
+                        , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
+                    pSession = pSess_lofar_gpu;
+                    break;
+                default: break;
+            }       
         break;
 
     default:
@@ -158,6 +154,15 @@ bool launch_file_processing(TYPE_OF_PROCESSOR PROCESSOR, TYPE_OF_INP_FORMAT INP_
         if (pSess_lofar_gpu)
         {
             delete   pSess_lofar_gpu;
+        }
+        if (pSess_guppi_cpu)
+        {
+            delete   pSess_guppi_cpu;
+        }
+
+        if (pSess_guppi_gpu)
+        {
+            delete   pSess_guppi_gpu;
         }
         return -1;
     }
@@ -249,11 +254,27 @@ int main(int argc, char** argv)
 
     CSession_lofar_cpu* pSess_lofar_cpu = nullptr;
     CSession_lofar_gpu* pSess_lofar_gpu = nullptr;
+    CSession_guppi_cpu* pSess_guppi_cpu = nullptr;
+    CSession_guppi_gpu* pSess_guppi_gpu = nullptr;
     switch (INP_FORMAT)
     {
     case GUPPI:
-        // pSess_guppi = new CSession_gpu_guppi(pPathInpFile, pPathOutFold, length_of_pulse, valD_max, sigma_Bound, lenWindow,lenChunk);
-        // pSession = pSess_guppi;
+        switch (PROCESSOR)
+        {
+        case CPU:
+            pSess_guppi_cpu = new CSession_guppi_cpu(pPathInpFile, pPathOutFold, length_of_pulse
+                , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
+            pSession = pSess_guppi_cpu;
+            break;
+
+        case GPU:
+            pSess_guppi_gpu = new CSession_guppi_gpu(pPathInpFile, pPathOutFold, length_of_pulse
+                , valD_min, valD_max, sigma_Bound, lenWindow, nbin, nfft);
+            pSession = pSess_guppi_gpu;
+            break;
+        default: break;
+        }
+
         break;
 
     case FLOFAR:

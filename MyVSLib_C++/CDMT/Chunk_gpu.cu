@@ -304,17 +304,14 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 
 		for (int idm = 0; idm < m_coh_dm_Vector.size(); ++idm)
 		{
-			auto start = std::chrono::high_resolution_clock::now();
-
-			int nc = 50;
-			for (int i = 0; i < nc; ++i)
-			{
+			//auto start = std::chrono::high_resolution_clock::now();
+			
 				elementWiseMult(m_pdcmpbuff_ewmulted, (cufftComplex*)pcmparrRawSignalCur, idm);
-			}
+			
 
-			auto end = std::chrono::high_resolution_clock::now();
+			/*auto end = std::chrono::high_resolution_clock::now();
 			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-			std::cout << "Time taken by function elementWiseMult: " << duration.count()/nc << " microseconds" << std::endl;
+			std::cout << "Time taken by function elementWiseMult: " << duration.count()/nc << " microseconds" << std::endl;*/
 			
 			checkCudaErrors(cufftExecC2C(m_fftPlanInverse, m_pdcmpbuff_ewmulted, m_pdcmpbuff_ewmulted, CUFFT_INVERSE));
 
@@ -342,17 +339,14 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 			dim3 threads_per_block1(512, 1, 1);
 			dim3 blocks_per_grid1((mbin_adjusted + threads_per_block1.x - 1) / threads_per_block1.x, m_nchan * m_len_sft, m_nfft);
 
-
 			transpose_unpadd_intensity__ << < blocks_per_grid1, threads_per_block1 >> > (fbuf, m_pdbuff_rolled, m_nfft, noverlap_per_channel
 				, mbin_adjusted, m_nchan, m_len_sft, mbin);
 
-			cudaDeviceSynchronize();
-
-			
+			cudaDeviceSynchronize();	
 
 
 			float* parr_wfall_disp = m_pdbuff_rolled;
-			double val_tsamp_wfall = m_len_sft * m_tsamp;
+			double val_tsamp_wfall = (double)(m_len_sft * m_tsamp);
 			double val_dm = m_coh_dm_Vector[idm];
 			double f0 = ((double)m_Fmax - (double)m_Fmin) / (m_nchan * m_len_sft);
 			dim3 threadsPerblock1(1024, 1, 1);

@@ -57,42 +57,6 @@ void CSession_lofar_cpu::freeInputMemory(void* parrInput, void* pcmparrRawSignal
     fftw_free(pcmparrRawSignalCur);
 }
 //---------------------------------------------------------------------------------
-/*bool unpack_chunk(const long long LenChunk, const int Noverlap, int m_nbin, int m_nfft, int m_npol, int  m_nchan
-    , int* d_parrInput, int* pcmparrRawSignalCur)
-{
-    if (LenChunk != (m_nbin + ((m_nbin - 2 * Noverlap) * (m_nfft - 1))))
-    {
-        printf("LenChunk is not true");
-        return false;
-    }
-    const long long num_chun = calc_ChunkPolarizationComplexNumbers(m_nfft, m_nchan, m_nbin);
-    for (int k = 0; k < m_npol / 2; ++k)
-    {
-        int* pout_begin = &(pcmparrRawSignalCur)[m_nfft * m_nchan* m_nbin * k];
-        int* pinpBegin0 = &d_parrInput[2 * k * LenChunk * m_nchan];
-        int* pinp1 = &d_parrInput[(1 + 2 * k) * LenChunk * m_nchan];
-        for (int ifft = 0; ifft < m_nfft; ++ifft)
-        {
-            for (int isub = 0; isub < m_nchan; ++isub)
-            {
-                int* pout_begin1 = pout_begin + ifft * m_nchan * m_nbin;
-                for (int ibin = 0; ibin < m_nbin; ++ibin)
-                {
-                    int iout = ifft * m_nchan * m_nbin + isub * m_nbin + ibin;
-                    int* pinpBegin = pinpBegin0 + ifft * m_nchan * (m_nbin - 2 * Noverlap);
-                    // int iinp = iout - ifft * m_nchan * 2 * Noverlap;
-                    pout_begin[ifft * m_nchan * m_nbin + isub * m_nbin + ibin ] = pinpBegin[ibin * m_nchan + isub];
-                    int ia = pout_begin1[isub * m_nbin + ibin];
-                    int tt = 0;
-                    //printf(" j = %i", pout_begin1 - pout_begin);
-                }
-            }
-        }
-    }
-
-    return 1;
-}*/
-
 bool CSession_lofar_cpu::unpack_chunk(const long long LenChunk, const int Noverlap
     , inp_type_* d_parrInput, void* pcmparrRawSignalCur)
 {

@@ -21,8 +21,8 @@ public:
 		, const double d_min, const double d_max, const float sigma_bound, const int length_sum_wnd, const int nbin, const int nfft);
 	
 
-	virtual bool  unpack_chunk(const long long lenChunk, const int j
-		, inp_type_* d_parrInput, void* pcmparrRawSignalCur);
+	virtual bool unpack_chunk(const long long LenChunk, const int Noverlap
+        , inp_type_* d_parrInput, void* pcmparrRawSignalCur);
 
 	
 

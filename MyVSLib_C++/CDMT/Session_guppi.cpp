@@ -347,9 +347,9 @@ size_t  CSession_guppi::download_chunk(FILE** rb_File, char* d_parrInput, const 
     size_t sz_rez = 0;
     for (int i = 0; i < m_header.m_nchan; ++i)
     {
-        long long position1 = ftell(*rb_File);
+       // long long position1 = ftell(*rb_File);
         sz_rez += fread(p, sizeof(char), quantDownloadingBytesPerChannel, *rb_File);
-        long long position2 = ftell(*rb_File);
+      //  long long position2 = ftell(*rb_File);
         if (m_header.m_bSraightchannelOrder)
         {
             p += quantDownloadingBytesPerChannel;
@@ -364,11 +364,11 @@ size_t  CSession_guppi::download_chunk(FILE** rb_File, char* d_parrInput, const 
             fseek(*rb_File, quantTotalBytesPerChannel - quantDownloadingBytesPerChannel, SEEK_CUR);
         }
 
-        long long position3 = ftell(*rb_File);
+       // long long position3 = ftell(*rb_File);
     }
-    long long position4 = ftell(*rb_File);
+   // long long position4 = ftell(*rb_File);
     fseek(*rb_File, -(m_header.m_nchan - 1) * quantTotalBytesPerChannel, SEEK_CUR);
-    long long position5 = ftell(*rb_File);
+   // long long position5 = ftell(*rb_File);
     return sz_rez;
 }
 //-----------------------------------------------------------------------
