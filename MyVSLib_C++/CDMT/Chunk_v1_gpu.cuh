@@ -41,40 +41,31 @@ public:
 		, const float tsamp);
 	//---------------------------------------------------------------------------------------
 	
-
-	//-------------------------------------------------------------------------
-	virtual bool process(void* pcmparrRawSignalCur
-		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg);	
-
-	void calc_fdmt_inp(fdmt_type_* d_parr_fdmt_inp, cufftComplex* pcarrTemp
-		, float* pAuxBuff);		
-
-	static long long calcLenChunk_(CTelescopeHeader header, const int nsft
-		, const float pulse_length, const float d_max);
-
-	void set_chunkid(const int nC);
-
-	void set_blockid(const int nC);
-
+	cufftComplex* m_pd_arr_dc;
 	
 
 	virtual void compute_chirp_channel();
 
-	
+	virtual void  elementWiseMult(cufftComplex* d_arrOut, cufftComplex* d_arrInp0, int  idm);
 
 };
 __global__
-void kernel_create_arr_dc1(cufftComplex* parr_dc, double* parrcoh_dm, double* parr_freqs_chan, double* parr_bin_freqs, double* parr_taper
+void kernel_create_arr_dc(cufftComplex* parr_dc, double* parrcoh_dm, double* parr_freqs_chan, double* parr_bin_freqs, double* parr_taper
 	, int ndm, int nchan, int len_sft, int mbin);
 
 __global__ void transpose_(float* odata, float* idata, int width, int height);
 
-__global__ void roll_rows_normalize_sum_kernel(float* arr_rez, cufftComplex* arr, const int npol, const int rows
-	, const  int cols, const  int shift);
 
-__global__
+
+__global__ 	
 void  transpose_unpadd_intensity(float* fbuf, float* arin, int nfft, int noverlap_per_channel
-	, int mbin_adjusted, const int nchan, const int nlen_sft, int mbin);
+	, int mbin_adjusted, const int nsub, const int nchan, int mbin);
+
+__global__ 	void  transpose_unpadd_intensity__(float* fbuf, float* arin, int nfft, int noverlap_per_channel
+	, int mbin_adjusted, const int nsub, const int nchan, int mbin);
+
+//__global__	void  transpose_unpadd_gpu(float* fbuf, float* arin, int nfft, int noverlap_per_channel
+//	, int mbin_adjusted, const int nsub, const int nchan, int mbin);
 
 
 

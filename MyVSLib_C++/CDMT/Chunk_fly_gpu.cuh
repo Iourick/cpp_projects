@@ -15,14 +15,14 @@ class CFragment;
 class CFdmtU;
 class CTelescopeHeader;
  
-class CChunk_py_gpu : public  CChunk_gpu
+class CChunk_fly_gpu : public  CChunk_gpu
 {
 public:
-	~CChunk_py_gpu();
-	CChunk_py_gpu();
-	CChunk_py_gpu(const  CChunk_py_gpu& R);
-	CChunk_py_gpu& operator=(const CChunk_py_gpu& R);
-	CChunk_py_gpu(
+	~CChunk_fly_gpu();
+	CChunk_fly_gpu();
+	CChunk_fly_gpu(const  CChunk_fly_gpu& R);
+	CChunk_fly_gpu& operator=(const CChunk_fly_gpu& R);
+	CChunk_fly_gpu(
 		const float Fmin
 		, const float Fmax
 		, const int npol
@@ -40,19 +40,40 @@ public:
 		, const int noverlap
 		, const float tsamp);
 	//---------------------------------------------------------------------------------------
-	cufftComplex* m_pd_arr_dc_py;
+	
+	
+	
 
-	//-------------------------------------------------------------------------
-	virtual bool process(void* pcmparrRawSignalCur
-		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg);		
+	virtual void compute_chirp_channel();
 
-	virtual void compute_chirp_channel();	
+	virtual void  elementWiseMult(cufftComplex* d_arrOut, cufftComplex* d_arrInp0, int  idm);
 
 };
 
+__device__ cufftComplex cmpMult(cufftComplex& a, cufftComplex& b);
+
+
 __global__
-void kernel_create_arr_dc_py(cufftComplex* parr_dc, double* parrcoh_dm, double* parr_freqs_chan, double* parr_bin_freqs, double* parr_taper
-	, int ndm, int nchan, int len_sft, int mbin);
+void kernel_el_wise_mult_onthe_fly(cufftComplex* parr_Out, cufftComplex* parr_Inp, double* pdm
+	, int nchan, int len_sft, int mbin, int nfft, int npol, double Fmin, double bw_sub, double bw_chan);
+
+__global__
+void kernel_el_wise_mult_onthe_fly_(cufftComplex* parr_Out, cufftComplex* parr_Inp, double* pdm
+	, int nchan, int len_sft, int mbin, int nfft, int npol, double Fmin, double bw_sub, double bw_chan);
+
+
+
+
+
+__global__ 	void  transpose_unpadd_intensity__(float* fbuf, float* arin, int nfft, int noverlap_per_channel
+	, int mbin_adjusted, const int nsub, const int nchan, int mbin);
+
+//__global__	void  transpose_unpadd_gpu(float* fbuf, float* arin, int nfft, int noverlap_per_channel
+//	, int mbin_adjusted, const int nsub, const int nchan, int mbin);
+
+
+
+
 
 
 

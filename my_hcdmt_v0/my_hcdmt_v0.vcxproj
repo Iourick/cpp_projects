@@ -106,6 +106,9 @@ copy "D:\cpp_projects\Dependencies\freeglut\bin\$(Platform)" "$(OutDir)"</Comman
     <CudaCompile Include="..\MyVSLib_C++\CDMT\Chunk_gpu.cu" />
     <CudaCompile Include="..\MyVSLib_C++\CDMT\Chunk_py_gpu.cu" />
     <CudaCompile Include="..\MyVSLib_C++\CDMT\Chunk_v1_gpu.cu" />
+    <CudaCompile Include="..\MyVSLib_C++\CDMT\Chunk_fly_gpu.cu" />
+    <CudaCompile Include="..\MyVSLib_C++\CDMT\Chunk_v3_gpu.cu" />
+    <CudaCompile Include="..\MyVSLib_C++\CDMT\Chunk_v4_gpu.cu" />
     <CudaCompile Include="..\MyVSLib_C++\CDMT\Session_guppi_gpu.cu" />
     <CudaCompile Include="..\MyVSLib_C++\Cleaning.cu" />
     <CudaCompile Include="..\MyVSLib_C++\Detection.cu" />
@@ -120,6 +123,9 @@ copy "D:\cpp_projects\Dependencies\freeglut\bin\$(Platform)" "$(OutDir)"</Comman
     <CudaCompile Include="..\MyVSLib_C++\CDMT\Chunk_gpu.cuh" />
     <ClInclude Include="..\MyVSLib_C++\CDMT\Chunk_py_gpu.cuh" />
     <ClInclude Include="..\MyVSLib_C++\CDMT\Chunk_v1_gpu.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\CDMT\Chunk_fly_gpu.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\CDMT\Chunk_v3_gpu.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\CDMT\Chunk_v4_gpu.cuh" />
     <ClInclude Include="..\MyVSLib_C++\CDMT\SessionB.h" />
     <ClInclude Include="..\MyVSLib_C++\CDMT\Session_guppi.h" />
     <ClInclude Include="..\MyVSLib_C++\CDMT\Session_guppi_cpu.h" />

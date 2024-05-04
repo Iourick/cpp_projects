@@ -41,7 +41,7 @@ public:
 	//---------------------------------------------------------------------------------------
 	double* m_pd_arrcoh_dm;
 
-	cufftComplex* m_pd_arr_dc;
+	
 
 	cufftHandle m_fftPlanForward;
 
@@ -87,6 +87,8 @@ public:
 
 	void create_fft_plans();
 
+	virtual void  elementWiseMult(cufftComplex* d_arrOut, cufftComplex* d_arrInp0, int  idm);
+
 };
 __global__
 void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double bw_chan, double  Fmin, double bw_sub);
@@ -119,6 +121,9 @@ void calc_intensity_kernel(float *intensity, const int len, const int npol, cuff
 __global__
 void  transpose_unpadd_kernel(cufftComplex* fbuf, cufftComplex* arin, int nfft, int noverlap_per_channel
 	, int mbin_adjusted, const int nchan, const int nlen_sft, int mbin);
+
+__global__	void  transpose_unpadd_kernel_(float* fbuf, cufftComplex* arin, int nfft, int npol, int noverlap_per_channel
+	, int mbin_adjusted, const int nsub, const int nchan, const int mbin);
 
 __global__ void transpose(float* odata, float* idata, int width, int height);
 
@@ -161,6 +166,12 @@ void fdmt_normalization(fdmt_type_* d_arr, fdmt_type_* d_norm, const int lenChun
 
 __global__
 void multiTransp_kernel(float* output, const int height, const int width, float* input);
+
+__global__ 	void  transpose_unpadd_intensity__(float* fbuf, float* arin, int nfft, int noverlap_per_channel
+	, int mbin_adjusted, const int nsub, const int nchan, int mbin);
+
+__global__ void roll_rows_normalize_sum_kernel(float* arr_rez, cufftComplex* arr, const int npol, const int rows
+	, const  int cols, const  int shift);
 
 
 

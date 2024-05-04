@@ -14,6 +14,9 @@
 #include "ChunkB.h"
 #include "Chunk_gpu.cuh"
 #include "Chunk_v1_gpu.cuh"
+#include "Chunk_fly_gpu.cuh"
+#include "Chunk_v3_gpu.cuh"
+#include "Chunk_v4_gpu.cuh"
 #include "Chunk_py_gpu.cuh"
 #include "npy.hpp"
 
@@ -113,7 +116,7 @@ void CSession_lofar_gpu::createChunk(CChunkB** ppchunk
     , const float tsamp)
 {
    
-        CChunk_gpu* chunk = new CChunk_v1_gpu(Fmin
+        CChunkB* chunk = new CChunk_fly_gpu(Fmin
             , Fmax
             , npol
             , nchan           

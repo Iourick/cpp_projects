@@ -76,16 +76,23 @@ extern cudaError_t cudaStatus0;
     #define BLOCK_DIM 32//16
 	CChunk_v1_gpu::~CChunk_v1_gpu()
 	{
-		
+		if (m_pd_arr_dc)
+		{
+			cudaFree(m_pd_arr_dc);
+		}
 	}
 	//-----------------------------------------------------------
 	CChunk_v1_gpu::CChunk_v1_gpu() :CChunk_gpu()
-	{		
+	{	
+		m_pd_arr_dc = nullptr;
 	}
 	//-----------------------------------------------------------
 
 	CChunk_v1_gpu::CChunk_v1_gpu(const  CChunk_v1_gpu& R) :CChunk_gpu(R)
 	{
+		cudaMalloc(&m_pd_arr_dc, R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(cufftComplex));
+		cudaMemcpy(m_pd_arr_dc, R.m_pd_arr_dc, R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(cufftComplex), cudaMemcpyDeviceToDevice);
+
 	}
 	//-------------------------------------------------------------------
 
@@ -97,6 +104,12 @@ extern cudaError_t cudaStatus0;
 		}
 		CChunk_gpu:: operator= (R);
 
+		if (m_pd_arr_dc)
+		{
+			cudaFree(m_pd_arr_dc);
+		}
+		cudaMalloc(&m_pd_arr_dc, R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(cufftComplex));
+		cudaMemcpy(m_pd_arr_dc, R.m_pd_arr_dc, R.m_coh_dm_Vector.size() * R.m_nchan * R.m_nbin * sizeof(cufftComplex), cudaMemcpyDeviceToDevice);
 		return *this;
 	}
 	//------------------------------------------------------------------
@@ -133,6 +146,7 @@ extern cudaError_t cudaStatus0;
 			, noverlap
 			, tsamp)
 	{
+		cudaMalloc(&m_pd_arr_dc, m_coh_dm_Vector.size() * m_nchan * m_nbin * sizeof(cufftComplex));
 		cudaStatus0 = cudaGetLastError();
 		if (cudaStatus0 != cudaSuccess) {
 			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
@@ -199,12 +213,7 @@ void CChunk_v1_gpu::compute_chirp_channel()
 	//std::array<long unsigned, 1> leshape1{ lenarr3 };
 	//npy::SaveArrayAsNumpy("parr_bin_freqs.npy", false, leshape1.size(), leshape1.data(), data3);
 
-	//int lenarr4 = mbin;// *sizeof(cufftComplex));
-	//std::vector<double> data4(lenarr4, 0);
-	//cudaMemcpy(data4.data(), d_parr_taper, lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
-	//cudaDeviceSynchronize();
-	//std::array<long unsigned, 1> leshape2{ lenarr4 };
-	//npy::SaveArrayAsNumpy("parr_taper.npy", false, leshape2.size(), leshape2.data(), data4);
+	
 
 
 	/*int deviceId;
@@ -217,9 +226,9 @@ void CChunk_v1_gpu::compute_chirp_channel()
 
 	
 
-	const dim3 block_Size2(512,2,1);
+	const dim3 block_Size2(256,2,1);
 	const dim3 gridSize2((mbin + block_Size2.x - 1) / block_Size2.x, (m_len_sft * m_nchan + block_Size2.y - 1) / block_Size2.y, (ndm + block_Size2.z -1)/ block_Size2.z);
-	kernel_create_arr_dc1 << < gridSize2, block_Size2 >> > (m_pd_arr_dc, m_pd_arrcoh_dm, d_parr_freqs_chan, d_parr_bin_freqs, d_parr_taper, ndm, m_nchan, m_len_sft, mbin);
+	kernel_create_arr_dc << < gridSize2, block_Size2 >> > (m_pd_arr_dc, m_pd_arrcoh_dm, d_parr_freqs_chan, d_parr_bin_freqs, d_parr_taper, ndm, m_nchan, m_len_sft, mbin);
 	cudaStatus0 = cudaGetLastError();
 	if (cudaStatus0 != cudaSuccess) {
 		fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
@@ -238,52 +247,8 @@ void CChunk_v1_gpu::compute_chirp_channel()
 	}
 }
 //-------------------------------------------------------------------------------------------
-//__global__
-//void kernel_create_arr_dc(cufftComplex* parr_dc, double* parrcoh_dm, double* parr_freqs_chan, double* parr_bin_freqs, double* parr_taper
-//	, int ndm, int nchan, int len_sft, int mbin)
-//{
-//	//__shared__  double temp0[1];
-//	//__shared__  int i0[1];
-//
-//	int ibin = blockIdx.x * blockDim.x + threadIdx.x;
-//	if (ibin >= mbin)
-//	{
-//		return;
-//	}
-//
-//	int num1 = blockIdx.y * blockDim.y + threadIdx.y;
-//	if (num1 >= nchan * len_sft)
-//	{
-//		return;
-//	}
-//
-//	int ichan = num1 / len_sft;
-//	int isft = num1 % len_sft;
-//
-//	int idm = blockIdx.z * blockDim.z + threadIdx.z;
-//	if (idm >= ndm)
-//	{
-//		return;
-//	}
-//
-//	float temp0 = parr_freqs_chan[ichan * len_sft + isft];
-//	int i0 = idm * nchan * len_sft * mbin + ichan * len_sft * mbin + isft * mbin;
-//
-//	double temp1 = parr_bin_freqs[ibin] / temp0;
-//	double phase_delay = (parrcoh_dm[idm] * temp1 * temp1 / (temp0 + parr_bin_freqs[ibin]) * 4.148808e9);
-//	double val_prD_int = 0;
-//	double t = -modf(phase_delay, &val_prD_int) * 2.0;
-//	double val_x = 0.0, val_y = 0.;
-//
-//	sincospi(t, &val_y, &val_x);
-//	parr_dc[i0 + ibin].x = float(val_x * parr_taper[ibin]);
-//	parr_dc[i0 + ibin].y = float(val_y * parr_taper[ibin]);
-//}
-
-
-//-------------------------------------------------------------------------------------------
 __global__
-void kernel_create_arr_dc1  (cufftComplex* parr_dc, double * parrcoh_dm,double* parr_freqs_chan, double* parr_bin_freqs, double *parr_taper
+void kernel_create_arr_dc  (cufftComplex* parr_dc, double * parrcoh_dm,double* parr_freqs_chan, double* parr_bin_freqs, double *parr_taper
 	, int ndm, int nchan, int len_sft, int mbin)
 {
 	//__shared__  double temp0[1];
@@ -293,8 +258,7 @@ void kernel_create_arr_dc1  (cufftComplex* parr_dc, double * parrcoh_dm,double* 
 	if (ibin >= mbin)
 	{
 		return;
-	}
-	
+	}	
 	int num1 = blockIdx.y * blockDim.y + threadIdx.y;
 	if (num1 >= nchan * len_sft)
 	{
@@ -313,7 +277,6 @@ void kernel_create_arr_dc1  (cufftComplex* parr_dc, double * parrcoh_dm,double* 
 	float temp0 = parr_freqs_chan[ichan * len_sft + isft];
 	int i0 = idm * nchan * len_sft * mbin + ichan * len_sft * mbin + isft * mbin;
 
-
 	double temp1 = parr_bin_freqs[ibin] / temp0;
 	double phase_delay=(parrcoh_dm[idm] * temp1 * temp1 / (temp0 + parr_bin_freqs[ibin]) * 4.148808e9);
 	double val_prD_int = 0;
@@ -329,225 +292,57 @@ void kernel_create_arr_dc1  (cufftComplex* parr_dc, double * parrcoh_dm,double* 
 	ibin1 = (ibin1 + nbin / 2) % nbin;
 	
 	
-	parr_dc[i1 * nbin + ibin1].x = float(val_x * parr_taper[ibin]/*/((double)nbin)*/);
-	parr_dc[i1 * nbin + ibin1].y = float(val_y * parr_taper[ibin] /*/ ((double)nbin)*/);
-}
-
-//------------------------------------------------------------------------------------------
-
-	bool CChunk_v1_gpu::process(void* pcmparrRawSignalCur
-		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg)
-	{
-		// 1. 
-		const int mbin = get_mbin();
-		const int noverlap_per_channel = get_noverlap_per_channel();
-		const int mbin_adjusted = get_mbin_adjusted();
-		const int msamp = get_msamp();
-		const int mchan = m_nchan * m_len_sft;
-		// 1!
-		
-		// 2. Forward FFT execution
-		checkCudaErrors(cufftExecC2C(m_fftPlanForward, (cufftComplex*)pcmparrRawSignalCur, (cufftComplex*)pcmparrRawSignalCur, CUFFT_FORWARD));		
-		//2!	
-		
-		cudaStatus0 = cudaGetLastError();
-		if (cudaStatus0 != cudaSuccess) {
-			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-			return false;
-		}
-		/*cufftComplex* pcmparrRawSignalRolled = NULL;
-		checkCudaErrors(cudaMalloc((void**) & pcmparrRawSignalRolled, m_nfft * m_nchan * m_npol / 2 * m_nbin * sizeof(cufftComplex)));
-		*/
-		
-		//3!
-		
-		for (int idm = 0; idm < m_coh_dm_Vector.size(); ++idm)
-		{
-			dim3 threadsPerBlock(1024, 1, 1);
-			dim3 blocksPerGrid((m_nchan * m_nbin + threadsPerBlock.x - 1) / threadsPerBlock.x, m_nfft, m_npol/2);
-			element_wise_cufftComplex_mult_kernel<<< blocksPerGrid, threadsPerBlock>>>
-				(m_pdcmpbuff_ewmulted,(cufftComplex*)pcmparrRawSignalCur, &m_pd_arr_dc[m_nchan * m_nbin * idm], m_npol/2,m_nfft, m_nchan * m_nbin);
-			cudaDeviceSynchronize();					
-			// result stored in m_pdcmpbuff_ewmulted
-			cudaStatus0 = cudaGetLastError();
-			if (cudaStatus0 != cudaSuccess) {
-				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-				return false;
-			}
-			checkCudaErrors(cufftExecC2C(m_fftPlanInverse, m_pdcmpbuff_ewmulted, m_pdcmpbuff_ewmulted, CUFFT_INVERSE));
-
-
-			int threads1 = 1024;
-			int blocks1 = (m_nfft * m_nchan * m_npol / 2 * m_nbin + threads1 - 1) / threads1;	
-
-			roll_rows_normalize_sum_kernel << <blocks1, threads1 >> > (m_pdbuff_rolled, m_pdcmpbuff_ewmulted, m_npol, m_nfft * m_nchan , m_nbin, m_nbin / 2);
-			cudaDeviceSynchronize();
-			// result stored in m_pdbuff_rolled		
-			cudaStatus0 = cudaGetLastError();
-			if (cudaStatus0 != cudaSuccess) {
-				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-				return false;
-			}
-
-			int noverlap_per_channel = get_noverlap_per_channel();
-			int mbin_adjusted = get_mbin_adjusted();
-			// result stored in m_pdbuff_rolled	
-			float* fbuf = (float*) m_pdcmpbuff_ewmulted;
-					
-			
-			dim3 threads_per_block1(1024, 1, 1);
-			dim3 blocks_per_grid1(( mbin_adjusted + threads_per_block1.x - 1) / threads_per_block1.x, m_nchan * m_len_sft, m_nfft);
-			
-			transpose_unpadd_intensity << < blocks_per_grid1, threads_per_block1 >> > 
-				(fbuf, m_pdbuff_rolled, m_nfft, noverlap_per_channel
-				, mbin_adjusted, m_nchan, m_len_sft, mbin);
-			cudaDeviceSynchronize();
-			// result stored in m_pdcmpbuff_ewmulted(=fbuf).  m_pdbuff_rolled	 is free
-			cudaStatus0 = cudaGetLastError();
-			if (cudaStatus0 != cudaSuccess) {
-				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-				return false;
-			}
-
-			float* parr_wfall = m_pdbuff_rolled;
-			
-			//
-			dim3 threadsPerChunk(TILE_DIM, TILE_DIM, 1);
-			dim3 chunkPerGrid((m_nchan* m_len_sft + TILE_DIM - 1) / TILE_DIM, ( msamp + TILE_DIM - 1) / TILE_DIM, 1);
-			
-
-			transpose_ << <  chunkPerGrid, threadsPerChunk >> > (parr_wfall, fbuf, m_nchan * m_len_sft, msamp);
-			cudaDeviceSynchronize();
-			cudaStatus0 = cudaGetLastError();
-			// result stored in m_pdbuff_rolled(=parr_wfall).  m_pdcmpbuff_ewmulted	 is free
-			
-			float* parr_wfall_disp = (float*)m_pdcmpbuff_ewmulted;
-			double val_tsamp_wfall = m_len_sft * m_tsamp;
-			double val_dm = m_coh_dm_Vector[idm];
-			double f0 = ((double)m_Fmax - (double)m_Fmin) / (m_nchan * m_len_sft);
-			dim3 threadsPerblock1 (1024,1,1);
-			dim3 blocksPerGrid1  ((msamp + threadsPerblock1.x - 1) / threadsPerblock1.x, m_nchan * m_len_sft, 1);
-			dedisperse << <  blocksPerGrid1, threadsPerblock1 >> > (parr_wfall_disp, parr_wfall, val_dm
-				, (double)m_Fmin, (double)m_Fmax,  val_tsamp_wfall, f0, msamp);
-			cudaDeviceSynchronize();
-						
-			
-			m_Fdmt.process_image(parr_wfall_disp, &m_pdoutImg[idm * msamp * m_len_sft], false);
-
-			cudaStatus0 = cudaGetLastError();
-			if (cudaStatus0 != cudaSuccess) {
-				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-				return false;
-			}			
-		
-			
-			
-		}
-
-		std::vector<std::vector<float>>* pvecImg_temp = nullptr;
-		if (nullptr != pvecImg)
-		{
-			pvecImg->resize(m_coh_dm_Vector.size());
-			for (auto& row : *pvecImg)
-			{
-				row.resize(msamp * m_len_sft);
-			}
-			pvecImg_temp = pvecImg;
-		}
-		else
-		{
-			pvecImg_temp = new std::vector<std::vector<float>>;
-			pvecImg_temp->resize(m_coh_dm_Vector.size());
-			for (auto& row : *pvecImg_temp)
-			{
-				row.resize(msamp * m_len_sft);
-			}
-		}
-		for (int i = 0; i < m_coh_dm_Vector.size(); ++i)
-		{
-			cudaMemcpy(pvecImg_temp->at(i).data(), &m_pdoutImg[i * msamp * m_len_sft], msamp* m_len_sft * sizeof(float), cudaMemcpyDeviceToHost);
-		}
-		cudaStatus0 = cudaGetLastError();
-		if (cudaStatus0 != cudaSuccess) {
-			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-			return false;
-		}
-		return true;
-	}
-
+	parr_dc[i1 * nbin + ibin1].x = float(val_x * parr_taper[ibin] / (double(nbin)));
+	
+	parr_dc[i1 * nbin + ibin1].y = float(val_y * parr_taper[ibin] / (double(nbin)));
+}	
 //-----------------------------------------------------------------------------
-
-	//__global__	void  transpose_unpadd_kernel(cufftComplex* fbuf, cufftComplex* arin, int nfft, int noverlap_per_channel
-	//	, int mbin_adjusted, const int nsub, const int nchan, int mbin)
-	//{
-	//	int  ibin = blockIdx.x * blockDim.x + threadIdx.x;
-	//	if (!(ibin < mbin_adjusted))
-	//	{
-	//		return;
-	//	}
-	//	int ipol = blockIdx.z / nfft;
-	//	int ifft = blockIdx.z % nfft;
-	//	int isub = blockIdx.y / nchan;
-	//	int ichan = blockIdx.y % nchan;
-	//	int ibin_adjusted = ibin + noverlap_per_channel;
-	//	int isamp = ibin + mbin_adjusted * ifft;
-	//	int msamp = mbin_adjusted * nfft;
-	//	// Select bins from valid region and reverse the frequency axis		
-	//   // printf("ipol = %i   ifft =  %i\n", ipol, ifft);
-	//	int iinp = ipol * nfft * nsub * nchan * mbin + ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted;
-	//	int iout = ipol * msamp * nsub * nchan + isamp * nsub * nchan + isub * nchan + nchan - ichan - 1;
-	//	// Select bins from valid region and reverse the frequency axis		
-
-	//	fbuf[iout].x = arin[iinp].x;
-	//	fbuf[iout].y = arin[iinp].y;
-	//}
-
-
 __global__ 	void  transpose_unpadd_intensity(float* fbuf, float* arin, int nfft, int noverlap_per_channel
-	, int mbin_adjusted,  const int nsub, const int nchan, int mbin)
+	, int mbin_adjusted, const int nsub, const int nchan, int mbin)
 {
 	int  ibin = blockIdx.x * blockDim.x + threadIdx.x;
 	if (!(ibin < mbin_adjusted))
 	{
 		return;
-	}	
-	int ifft = blockIdx.z ;
+	}
+
+	int ifft = blockIdx.z;
 	int isub = blockIdx.y / nchan;
 	int ichan = blockIdx.y % nchan;
 	int ibin_adjusted = ibin + noverlap_per_channel;
 	int isamp = ibin + mbin_adjusted * ifft;
 	int msamp = mbin_adjusted * nfft;
+
 	// Select bins from valid region and reverse the frequency axis		
-   // printf("ipol = %i   ifft =  %i\n", ipol, ifft);
+	// printf("ipol = %i   ifft =  %i\n", ipol, ifft);
 	int iinp = ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted;
 	int iout = isamp * nsub * nchan + isub * nchan + nchan - ichan - 1;
-	// Select bins from valid region and reverse the frequency axis	
-	fbuf[iout] = arin[iinp];
-}
+	// Select bins from valid region and reverse the frequency axis		
 
-
-//---------------------------------------------------------------------------
-__global__ void roll_rows_normalize_sum_kernel(float* arr_rez, cufftComplex* arr, const int npol, const int rows
-	, const  int cols, const  int shift)
-{
-
-	int idx0 = blockIdx.x * blockDim.x + threadIdx.x;
-	if (idx0 >= cols)
+	if ((ifft == 0) && (isub == 0) && (ichan == 0) && (ibin < 10))
 	{
+		//printf("ibin = %i  arin[iinp] = %f\n", ibin, arin[iinp]);
+	}
+	fbuf[iout] = arin[iinp];
+
+}
+//--------------------------------------------------------------------------------------
+
+
+void  CChunk_v1_gpu::elementWiseMult(cufftComplex* d_arrOut, cufftComplex* d_arrInp0	, int  idm)
+{
+	dim3 threadsPerBlock(1024, 1, 1);
+	dim3 blocksPerGrid((m_nchan * m_nbin + threadsPerBlock.x - 1) / threadsPerBlock.x, m_nfft, m_npol / 2);
+	element_wise_cufftComplex_mult_kernel << < blocksPerGrid, threadsPerBlock >> >
+		(d_arrOut, d_arrInp0, &m_pd_arr_dc[m_nchan * m_nbin * idm], m_npol / 2, m_nfft, m_nchan * m_nbin);
+	cudaDeviceSynchronize();
+	// result stored in m_pdcmpbuff_ewmulted
+	cudaStatus0 = cudaGetLastError();
+	if (cudaStatus0 != cudaSuccess) {
+		fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
 		return;
 	}
-	int ind_new = blockIdx.y * cols + (idx0 + shift) % cols;
-	int ind = blockIdx.y * cols + idx0;
-	arr_rez[ind_new] = 0.0f;
-	for (int ipol = 0; ipol < npol / 2; ++ipol)
-	{
-		int ind_cur = ind + ipol * rows * cols;
-		double x = (double)arr[ind_cur].x;
-		double y = (double)arr[ind_cur].y;
-		arr_rez[ind_new] += float((x * x + y * y) / cols / cols);
-	}
 }
-
 
 //----------------------------------------------------------------------------------------
 // #define BLOCK_DIM 32//16
