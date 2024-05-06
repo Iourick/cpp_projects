@@ -163,14 +163,8 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
     const long long QUantTotalChannelBytes = calc_TotalChannelBytes();
     const long long QUantChunkComplexNumbers = calc_ChunkComplexNumbers();
     const long long QUantDownloadingBytesForChunk = calc_ChunkBytes(LenChunk);
-    const long long QUantOverlapBytes= calc_ChunkBytes(Noverlap); 
-    
-   /* do_plan_and_memAlloc(&lenChunk
-        ,&plan0, &plan1, &fdmt,&d_parrInput, &pcmparrRawSignalCur
-        ,&pAuxBuff_fdmt,&d_arrfdmt_norm
-        ,&pcarrTemp
-        ,&pcarrCD_Out
-        , &pcarrBuff, &pInpOutBuffFdmt, &pChunk);*/
+    const long long QUantOverlapBytes= calc_ChunkBytes(Noverlap);     
+  
    
     void* parrInput =  nullptr;
     void* pcmparrRawSignalCur = nullptr;
@@ -185,8 +179,8 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
     CChunkB* pChunk= new  CChunkB();
     CChunkB** ppChunk = &pChunk;    
     createChunk(ppChunk
-        , m_header.m_centfreq - m_header.m_obsBW / 2.0
-        , m_header.m_centfreq + m_header.m_obsBW / 2.0
+        , m_header.m_centfreq - fabs(m_header.m_obsBW) / 2.0
+        , m_header.m_centfreq + fabs(m_header.m_obsBW) / 2.0
         , m_header.m_npol
         , m_header.m_nchan        
         , len_sft
@@ -240,10 +234,10 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
            (*ppChunk)->process(pcmparrRawSignalCur, m_pvctSuccessHeaders, pvecImg);
 
            // TEMPORARY FOR DEBUGGING LOFAR ONLY! DELETE LATER!
-           if (0== j)
+          /* if (0== j)
            {
               break;
-           }
+           }*/
                
         }
         *pmsamp = (*ppChunk)-> get_msamp();        
@@ -765,8 +759,8 @@ bool CSessionB::navigateToBlock(FILE* rb_File,const int IBlockNum)
 
 int CSessionB::get_optimal_overlap(const int nsft)
 {
-    float  bw_chan = m_header.m_obsBW / (m_header.m_nchan * nsft);       
-    float   fmin_bottom = m_header.m_centfreq - m_header.m_obsBW / 2.;        
+    float  bw_chan = fabs(m_header.m_obsBW) / (m_header.m_nchan * nsft);       
+    float   fmin_bottom = m_header.m_centfreq - fabs(m_header.m_obsBW) / 2.;
     float   fmin_top = fmin_bottom + bw_chan;
     float   delay = 4.148808e3 * m_d_max * (1.0 / (fmin_bottom * fmin_bottom) - 1.0 / (fmin_top * fmin_top));
     float   delay_samples = round(delay / m_header.m_tresolution);
@@ -776,8 +770,8 @@ int CSessionB::get_optimal_overlap(const int nsft)
 int  CSessionB::get_coherent_dms()
 {
     // Compute the coherent DMs for the FDMT algorithm.
-    float f_min = m_header.m_centfreq - m_header.m_obsBW / 2.0; 
-    float f_max = m_header.m_centfreq + m_header.m_obsBW / 2.0;
+    float f_min = m_header.m_centfreq - fabs(m_header.m_obsBW) / 2.0;
+    float f_max = m_header.m_centfreq + fabs(m_header.m_obsBW) / 2.0;
     float    t_d = 4.148808e3 * m_d_max * (1.0 / (f_min * f_min) - 1.0 / (f_max * f_max));
     int irez = ceil(t_d * m_header.m_tresolution / (m_pulse_length * m_pulse_length));
     return irez;

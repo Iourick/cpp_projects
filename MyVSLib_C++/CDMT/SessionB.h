@@ -48,8 +48,7 @@ public:
 	double m_d_max;
 	double m_d_min;
 	float m_sigma_bound;
-	int m_length_sum_wnd;
-	//int m_lenChunk;
+	int m_length_sum_wnd;	
 	int m_nbin;
 	int m_nfft;
 
@@ -72,13 +71,6 @@ public:
 
 	int get_optimal_overlap(const int nsft);
 
-	/*bool do_plan_and_memAlloc( int* pLenChunk
-		, cufftHandle* pplan0, cufftHandle* pplan1, CFdmtU* pfdmt, char** d_pparrInput, cufftComplex** ppcmparrRawSignalCur
-		, void** ppAuxBuff_fdmt, fdmt_type_** d_parrfdmt_norm
-		, cufftComplex** ppcarrTemp
-		, cufftComplex** ppcarrCD_Out
-		, cufftComplex** ppcarrBuff, char** ppInpOutBuffFdmt, CChunk** ppChunk);*/
-
 	virtual bool readTelescopeHeader(FILE* r_File
 		, int* nbits
 		, float* chanBW
@@ -93,14 +85,7 @@ public:
 	);
 
 	virtual bool allocateInputMemory(void** parrInput, const int QUantDownloadingBytesForChunk, void** pcmparrRawSignalCur
-		, const int QUantChunkComplexNumbers);
-
-	/*void plan_and_memAlloc( int* pLenChunk
-		, cufftHandle* pplan0, cufftHandle* pplan1, CFdmtU* pfdmt, char** d_pparrInput, cufftComplex** ppcmparrRawSignalCur
-		, void** ppAuxBuff_fdmt, fdmt_type_** d_parrfdmt_norm
-		, cufftComplex** ppcarrTemp
-		, cufftComplex** ppcarrCD_Out
-		, cufftComplex** ppcarrBuff, char** ppInpOutBuffFdmt, CChunk** ppChunk);*/
+		, const int QUantChunkComplexNumbers);	
 
 	/*static long long _calcLenChunk_(CTelescopeHeader header, const int nsft
 		, const float pulse_length, const float d_max);*/

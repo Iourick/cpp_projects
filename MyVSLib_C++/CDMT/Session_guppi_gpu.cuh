@@ -40,6 +40,10 @@ public:
 
 	virtual void freeInputMemory(void* parrInput, void* pcmparrRawSignalCur);
 
-};
+    virtual size_t  download_chunk(FILE** rb_File, char* d_parrInput, const long long QUantDownloadingBytes);
 
+};
+__global__
+void unpack_chunk_guppi_gpu(int nsamp, int Noverlap, int nbin, int  nfft, int npol, int nchan
+    , inp_type_* parrInput, cufftComplex* d_parrOut);
 

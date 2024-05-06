@@ -141,10 +141,7 @@ extern cudaError_t cudaStatus0 = cudaErrorInvalidDevice;
 			cudaFree(m_pdcmpbuff_ewmulted);
 		}
 
-		if (m_pdcmpbuff_ewmulted)
-		{
-			cudaFree(m_pdcmpbuff_ewmulted);
-		}
+		
 		checkCudaErrors(cudaMalloc((void**)&m_pdcmpbuff_ewmulted, R.m_nfft * R.m_nchan * R.m_npol / 2 * R.m_nbin * sizeof(cufftComplex)));
 
 		if (m_pdbuff_rolled)
@@ -221,7 +218,7 @@ extern cudaError_t cudaStatus0 = cudaErrorInvalidDevice;
 
 		checkCudaErrors(cudaMalloc((void**)&m_pdcmpbuff_ewmulted, m_nfft * m_nchan * m_npol / 2 * m_nbin * sizeof(cufftComplex)));
 
-		checkCudaErrors(cudaMalloc((void**)&m_pdbuff_rolled, m_nfft * m_nchan * m_npol / 2 * m_nbin * sizeof(float)));
+		checkCudaErrors(cudaMalloc((void**)&m_pdbuff_rolled, m_nfft * m_nchan  * m_nbin * sizeof(float)));
 
 		checkCudaErrors(cudaMalloc((void**)&m_pdoutImg, msamp * m_len_sft * m_coh_dm_Vector.size() * sizeof(float)));
 
@@ -307,20 +304,34 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 			//auto start = std::chrono::high_resolution_clock::now();
 			
 				elementWiseMult(m_pdcmpbuff_ewmulted, (cufftComplex*)pcmparrRawSignalCur, idm);
-			
+				cudaStatus0 = cudaGetLastError();
+				if (cudaStatus0 != cudaSuccess) {
+					fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
+					return false;
+				}
 
 			/*auto end = std::chrono::high_resolution_clock::now();
 			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 			std::cout << "Time taken by function elementWiseMult: " << duration.count()/nc << " microseconds" << std::endl;*/
 			
 			checkCudaErrors(cufftExecC2C(m_fftPlanInverse, m_pdcmpbuff_ewmulted, m_pdcmpbuff_ewmulted, CUFFT_INVERSE));
-
+			cudaStatus0 = cudaGetLastError();
+			if (cudaStatus0 != cudaSuccess) {
+				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
+				return false;
+			}
 
 			dim3 threads(1024, 1);
-			dim3 blocks((m_nbin + threads.x - 1) / threads.x, m_nfft * m_nchan * m_npol / 2);
+			dim3 blocks((m_nbin + threads.x - 1) / threads.x, m_nfft * m_nchan );
 			roll_rows_normalize_sum_kernel << <blocks, threads >> > (m_pdbuff_rolled, m_pdcmpbuff_ewmulted, m_npol, m_nfft * m_nchan, m_nbin, m_nbin / 2);
 			cudaDeviceSynchronize();
 
+
+			cudaStatus0 = cudaGetLastError();
+			if (cudaStatus0 != cudaSuccess) {
+				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
+				return false;
+			}
 			/*int lenarr4 = msamp * m_nchan * m_len_sft;
 			std::vector<float> data4(lenarr4, 0);
 			cudaMemcpy(data4.data(), (float*)m_pdbuff_rolled, lenarr4 * sizeof(float), cudaMemcpyDeviceToHost);
@@ -343,7 +354,11 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 				, mbin_adjusted, m_nchan, m_len_sft, mbin);
 
 			cudaDeviceSynchronize();	
-
+			cudaStatus0 = cudaGetLastError();
+			if (cudaStatus0 != cudaSuccess) {
+				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
+				return false;
+			}
 
 			float* parr_wfall_disp = m_pdbuff_rolled;
 			double val_tsamp_wfall = (double)(m_len_sft * m_tsamp);
@@ -354,7 +369,11 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 			dedisperse << <  blocksPerGrid1, threadsPerblock1 >> > (parr_wfall_disp, fbuf, val_dm
 				, (double)m_Fmin, (double)m_Fmax, val_tsamp_wfall, f0, msamp);
 			cudaDeviceSynchronize();
-
+			cudaStatus0 = cudaGetLastError();
+			if (cudaStatus0 != cudaSuccess) {
+				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
+				return false;
+			}
 
 			/*int lenarr4 = msamp * m_nchan * m_len_sft;
 			std::vector<float> data4(lenarr4, 0);
