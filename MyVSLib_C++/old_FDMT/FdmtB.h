@@ -24,7 +24,10 @@ public:
 	float m_Fmax;
 	int m_imaxDt; // quantity of rows of output image
 	// configuration params:
-	
+	int** m_pparrRowsCumSum_h;
+	float** m_pparrFreq_h;
+	int* m_parrQuantMtrx_h;
+	int m_iNumIter;
 
 	virtual void process_image(fdmt_type_* piarrImgInp, fdmt_type_* piarrImgOut, const bool b_ones);
 
@@ -42,7 +45,7 @@ public:
 
 	int  calc_quant_iterations_and_lengthSubMtrxArray(int** pparrLength);
 
-	//void create_config(int**& pparrRowsCumSum, float**& pparrFreq, int** pparrQuantMtrx, int* piNumIter);
+	void create_config(int**& pparrRowsCumSum, float**& pparrFreq, int** pparrQuantMtrx, int* piNumIter);
 
 	virtual size_t calcSizeAuxBuff_fdmt_();
 

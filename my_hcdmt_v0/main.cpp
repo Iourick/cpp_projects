@@ -1,11 +1,10 @@
 ﻿#include "main.h"
 #include <iostream>
 
-//#include <fftw3.h>
+
 #include <GL/glut.h>
 #include <fstream>
-//#include "HybridC_v0.h"
-//#include "utilites.h"
+
 #include "OutChunk.h"
 //#include "Fragment.h"
 
@@ -49,7 +48,7 @@ double length_of_pulse = 5.12E-6 * 32.0;//;
 float sigma_Bound = 12.;
 int lenWindow = 1;
 int nbin = 262144 ;
-int nfft =10;
+int nfft =20;
 /*************** ! DATA FOR LOFAR *****************************/
 
 
@@ -71,7 +70,7 @@ int nfft =10;
 /*************** !  GUPPI ********************************************/
 
 
-     /*************** ! TEST FOR GUPPI ********************************************/
+   
 
 //
 void showInputString(char* pPathLofarFile, char* pPathOutFold, float length_of_pulse

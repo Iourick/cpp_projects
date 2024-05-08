@@ -58,7 +58,8 @@ public:
 
 	void  transpose_unpadd(fftwf_complex* arin, fftwf_complex* arout);
 
-	static void fnc_roll_ffted(fftwf_complex* pcmparr_ffted, const int NRows, const int NCols);
+     void fnc_roll_ffted(fftwf_complex* pcmparr_ffted, const int NRows, const int NCols);
+
 
 	template <typename T>
 	static void roll_(T* arr, const int lenarr, const int ishift);

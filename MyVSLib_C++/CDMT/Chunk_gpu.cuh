@@ -1,6 +1,5 @@
 #pragma once
 #include "stdio.h"
-#include <vector>
 #include <cufft.h>
 #include "Constants.h"
 #include <complex> 

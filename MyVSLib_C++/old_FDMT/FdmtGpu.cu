@@ -81,7 +81,7 @@ CFdmtGpu::~CFdmtGpu()
 	
 }
 //---------------------------------------
-CFdmtGpu::CFdmtGpu():CFdmtCpu()
+CFdmtGpu::CFdmtGpu():CFdmtB()
 {	
 	m_arrOut0 = NULL;
 	m_arrOut1 = NULL;
@@ -96,7 +96,7 @@ CFdmtGpu::CFdmtGpu():CFdmtCpu()
 }
 //-----------------------------------------------------------
 
-CFdmtGpu::CFdmtGpu(const  CFdmtGpu& R) :CFdmtCpu()
+CFdmtGpu::CFdmtGpu(const  CFdmtGpu& R) :CFdmtB()
 {	
 	m_lenSt0 = R.m_lenSt0;
 	m_lenSt1 = R.m_lenSt1;	
@@ -138,7 +138,7 @@ CFdmtGpu& CFdmtGpu::operator=(const CFdmtGpu& R)
 	{
 		return *this;
 	}
-	CFdmtCpu:: operator= (R);
+	CFdmtB:: operator= (R);
 	m_lenSt0 = R.m_lenSt0;
 	m_lenSt1 = R.m_lenSt1;
 
@@ -232,7 +232,7 @@ CFdmtGpu::CFdmtGpu(
 	, const int nchan // quant channels/rows of input image, including consisting of zeroes
 	, const int cols
 	, const int imaxDt // quantity of rows of output image
-) : CFdmtCpu(Fmin, Fmax, nchan, cols, imaxDt)
+) : CFdmtB(Fmin, Fmax, nchan, cols, imaxDt)
 {	
 	cudaMalloc((void**)&m_parrQuantMtrx_d, (1 + m_iNumIter) * sizeof(int));
 	cudaMemcpy(m_parrQuantMtrx_d, m_parrQuantMtrx_h, (1 + m_iNumIter) * sizeof(int), cudaMemcpyHostToDevice);

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Constants.h"
-#include "FdmtCpu.h"
-class CFdmtGpu:public CFdmtCpu
+#include "FdmtB.h"
+class CFdmtGpu:public CFdmtB
 {
 public:
 	~CFdmtGpu();

@@ -207,13 +207,15 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
   //  std::vector<std::vector<float>>* pvecImg = new std::vector<std::vector<float>>;
     for (int nB = 0; nB < IBlock; ++nB)        
     {          
-        std::cout << "                               BLOCK=  " << nB <<std::endl;  
+       
         createCurrentTelescopeHeader(prb_File);     
        
         const int NumChunks = (m_header.m_nblocksize - 2 *QUantOverlapBytes - 1) / (QUantChunkBytes - 2 *QUantOverlapBytes) + 1;
+        std::cout << "    BLOCK=  " << nB <<  "  NUM CHUNKS = "<< NumChunks<<std::endl;
         // !6           
         for (int j = 0; j < NumChunks; ++j)
         { 
+            std::cout << "                chunk =   " << j <<  std::endl;
             if (j == (NumChunks - 1))
             {
                 size_t shift = calc_ShiftingBytes(QUantChunkBytes);

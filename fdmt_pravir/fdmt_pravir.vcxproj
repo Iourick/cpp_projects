@@ -12,7 +12,7 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{2B42DF9A-3332-423D-9EEB-33B13142CC54}</ProjectGuid>
-    <RootNamespace>fdmt_class_v0</RootNamespace>
+    <RootNamespace>fdmt_pravir</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -53,7 +53,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;USE_OPENMP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(SolutionDir);..\Dependencies\freeglut\include;..\MyVSLib_C++;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
@@ -82,7 +82,6 @@
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;USE_OPENMP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(SolutionDir);..\Dependencies\freeglut\include;..\MyVSLib_C++;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <MultiProcessorCompilation>false</MultiProcessorCompilation>
       <OpenMPSupport>true</OpenMPSupport>
     </ClCompile>
     <Link>
@@ -104,7 +103,6 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CudaCompile Include="..\MyVSLib_C++\FDMT\FdmtGpu.cu" />
     <CudaCompile Include="kernel.cu" />
   </ItemGroup>
   <ItemGroup>
@@ -112,21 +110,20 @@
     <ClInclude Include="..\Dependencies\freeglut\include\GL\glut.h" />
     <ClInclude Include="..\MyVSLib_C++\Constants.h" />
     <ClInclude Include="..\MyVSLib_C++\DrawImg.h" />
-    <ClInclude Include="..\MyVSLib_C++\FDMT\FdmtB.h" />
-    <ClInclude Include="..\MyVSLib_C++\FDMT\FdmtCpu.h" />
-    <ClInclude Include="..\MyVSLib_C++\FDMT\FdmtGpu.cuh" />
     <ClInclude Include="..\MyVSLib_C++\fileInput.h" />
     <ClInclude Include="..\MyVSLib_C++\npy.hpp" />
     <ClInclude Include="..\MyVSLib_C++\yr_cart.h" />
     <ClInclude Include="Dependencies\freeglut\include\IL\devil_internal_exports.h" />
+    <ClInclude Include="fdmt.h" />
+    <ClInclude Include="fdmt_utils.hpp" />
     <ClInclude Include="kernel.cuh" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\MyVSLib_C++\DrawImg.cpp" />
-    <ClCompile Include="..\MyVSLib_C++\FDMT\FdmtB.cpp" />
-    <ClCompile Include="..\MyVSLib_C++\FDMT\FdmtCpu.cpp" />
     <ClCompile Include="..\MyVSLib_C++\fileInput.cpp" />
     <ClCompile Include="..\MyVSLib_C++\yr_cart.cpp" />
+    <ClCompile Include="fdmt.cpp" />
+    <ClCompile Include="fdmt_utils.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
