@@ -102,8 +102,7 @@ void kernel_create_arr_dc(cufftComplex* parr_dc, double* parrcoh_dm, double* par
 __global__ 
 void roll_rows_and_normalize_kernel(cufftComplex* arr_rez, cufftComplex* arr, int rows, int cols, int shift);
 
-__global__ 
-void roll_rows_kernel(cufftComplex* arr_rez, cufftComplex* arr, int rows, int cols, int shift);
+
 
 __global__ 
 void  element_wise_cufftComplex_mult_kernel(cufftComplex* d_arrOut, cufftComplex* d_arrInp0, cufftComplex* d_arrInp1

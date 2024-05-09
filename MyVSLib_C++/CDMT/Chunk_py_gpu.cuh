@@ -54,7 +54,7 @@ __global__
 void kernel_create_arr_dc_py(cufftComplex* parr_dc, double* parrcoh_dm, double* parr_freqs_chan, double* parr_bin_freqs, double* parr_taper
 	, int ndm, int nchan, int len_sft, int mbin);
 
-
+__global__ void roll_rows_kernel(cufftComplex* arr_rez, cufftComplex* arr, int rows, int cols, int shift);
 
 
 

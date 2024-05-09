@@ -1,6 +1,7 @@
 #include <cmath>
 #include <omp.h>
 #include <cstdint>
+#include <stdexcept>
 //#include <spdlog.h>
 #ifdef USE_OPENMP
 #include <omp.h>
@@ -96,11 +97,74 @@ void FDMT::execute(const float* waterfall, size_t waterfall_size, float* dmt,
     }
     std::copy_n(state_out_ptr, dmt_size, dmt);
 }
+//
+//void FDMT::initialise(const float* waterfall, float* state) {
+//    const auto& dt_grid_init = get_dt_grid_init();
+//    const size_t ndt = dt_grid_init.size();
+//    const auto dt_init_min = dt_grid_init[0];
+//    // Initialise state for [:, dt_init_min, dt_init_min:]
+//#ifdef USE_OPENMP
+//#pragma omp parallel for
+//#endif
+//    for (int ii = 0; ii < nchans * nsamps; ++ii)
+//    {
+//       int ichan = ii / nsamps;
+//       int isamp = ii% nsamps;
+//       if (isamp < dt_init_min)
+//       {
+//           continue;
+//       }
+//       float sum = 0.0F;
+//       for (size_t i = isamp - dt_init_min; i <= isamp; ++i)
+//       {
+//           sum += waterfall[ichan * nsamps + i];
+//       }
+//       state[ichan * ndt * nsamps + isamp]
+//           = sum / static_cast<float>(dt_init_min + 1);
+//    }
+//    
+//
+//    // Initialise state for [:, dt_grid_init[i_dt], dt_grid_init[i_dt]:]
+//    for (int i_dt = 1; i_dt < ndt; ++i_dt)
+//    {
+//        const auto dt_init_cur = dt_grid_init[i_dt];
+//        const auto dt_init_prev = dt_grid_init[i_dt - 1];
+//#ifdef USE_OPENMP
+//#pragma omp parallel for
+//#endif
+//        for (int ii = 0; ii < nchans * nsamps; ++ii)
+//        {
+//            int ichan = ii / nsamps;
+//            int isamp = ii % nsamps;
+//            if (isamp < isamp - dt_init_cur)
+//            {
+//            continue;
+//            }
+//            float sum = 0.0F;
+//            for (int i = isamp - dt_init_cur; i < isamp - dt_init_prev; ++i)
+//            {
+//                sum += waterfall[ichan * nsamps + i];
+//            }
+//            state[ichan * ndt * nsamps + i_dt * nsamps + isamp]
+//                = (state[ichan * ndt * nsamps + (i_dt - 1) * nsamps + isamp]
+//                    * (static_cast<float>(dt_init_prev) + 1.0F)
+//                    + sum)
+//                / (static_cast<float>(dt_init_cur) + 1.0F);
+//            
+//        }
+//     
+//    }
+//}
 
+
+
+
+//---------------------------------------------------
+// 
 void FDMT::initialise(const float* waterfall, float* state) {
     const auto& dt_grid_init = get_dt_grid_init();
-    const size_t ndt         = dt_grid_init.size();
-    const auto dt_init_min   = dt_grid_init[0];
+    const size_t ndt = dt_grid_init.size();
+    const auto dt_init_min = dt_grid_init[0];
     // Initialise state for [:, dt_init_min, dt_init_min:]
 #ifdef USE_OPENMP
 #pragma omp parallel for
@@ -118,7 +182,7 @@ void FDMT::initialise(const float* waterfall, float* state) {
 
     // Initialise state for [:, dt_grid_init[i_dt], dt_grid_init[i_dt]:]
     for (int i_dt = 1; i_dt < ndt; ++i_dt) {
-        const auto dt_init_cur  = dt_grid_init[i_dt];
+        const auto dt_init_cur = dt_grid_init[i_dt];
         const auto dt_init_prev = dt_grid_init[i_dt - 1];
 #ifdef USE_OPENMP
 #pragma omp parallel for
@@ -127,34 +191,32 @@ void FDMT::initialise(const float* waterfall, float* state) {
             for (int isamp = dt_init_cur; isamp < nsamps; ++isamp) {
                 float sum = 0.0F;
                 for (int i = isamp - dt_init_cur; i < isamp - dt_init_prev;
-                     ++i) {
+                    ++i) {
                     sum += waterfall[ichan * nsamps + i];
                 }
                 state[ichan * ndt * nsamps + i_dt * nsamps + isamp]
                     = (state[ichan * ndt * nsamps + (i_dt - 1) * nsamps + isamp]
-                           * (static_cast<float>(dt_init_prev) + 1.0F)
-                       + sum)
-                      / (static_cast<float>(dt_init_cur) + 1.0F);
+                        * (static_cast<float>(dt_init_prev) + 1.0F)
+                        + sum)
+                    / (static_cast<float>(dt_init_cur) + 1.0F);
             }
         }
     }
 
-  //  spdlog::debug("FDMT: initialised dimensions: {}x{}x{}", nchans, ndt,
-           //       nsamps);
 }
 
 // Private methods
-//void FDMT::check_inputs(size_t waterfall_size, size_t dmt_size) const {
-//    if (waterfall_size != nchans * nsamps) {
-//        throw std::invalid_argument("Invalid size of waterfall");
-//    }
-//    const auto& [nchans_final, dt_final, nsamps_final]
-//        = fdmt_plan.state_shape[niters];
-//    if (dmt_size != nchans_final * dt_final * nsamps_final) {
-//        throw std::invalid_argument("Invalid size of dmt");
-//    }
-//    spdlog::debug("FDMT: Input dimensions: {}x{}", nchans, nsamps);
-//}
+void FDMT::check_inputs(size_t waterfall_size, size_t dmt_size) const {
+    if (waterfall_size != nchans * nsamps) {
+        throw std::invalid_argument("Invalid size of waterfall");
+    }
+    const auto& [nchans_final, dt_final, nsamps_final]
+        = fdmt_plan.state_shape[niters];
+    if (dmt_size != nchans_final * dt_final * nsamps_final) {
+        throw std::invalid_argument("Invalid size of dmt");
+    }
+   // spdlog::debug("FDMT: Input dimensions: {}x{}", nchans, nsamps);
+}
 
 void FDMT::execute_iter(const float* state_in, float* state_out,
                         size_t i_iter) {

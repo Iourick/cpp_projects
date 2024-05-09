@@ -114,7 +114,8 @@
     <ClInclude Include="..\MyVSLib_C++\npy.hpp" />
     <ClInclude Include="..\MyVSLib_C++\yr_cart.h" />
     <ClInclude Include="Dependencies\freeglut\include\IL\devil_internal_exports.h" />
-    <ClInclude Include="fdmt.h" />
+    <ClInclude Include="fdmt_base.hpp" />
+    <ClInclude Include="fdmt_cpu.hpp" />
     <ClInclude Include="fdmt_utils.hpp" />
     <ClInclude Include="kernel.cuh" />
   </ItemGroup>
@@ -122,7 +123,8 @@
     <ClCompile Include="..\MyVSLib_C++\DrawImg.cpp" />
     <ClCompile Include="..\MyVSLib_C++\fileInput.cpp" />
     <ClCompile Include="..\MyVSLib_C++\yr_cart.cpp" />
-    <ClCompile Include="fdmt.cpp" />
+    <ClCompile Include="fdmt_base.cpp" />
+    <ClCompile Include="fdmt_cpu.cpp" />
     <ClCompile Include="fdmt_utils.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

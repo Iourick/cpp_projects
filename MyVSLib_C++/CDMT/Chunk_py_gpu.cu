@@ -338,11 +338,17 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 	//cudaMalloc(&poutImg, msamp * m_len_sft * m_coh_dm_Vector.size() * sizeof(float));
 	for (int idm = 0; idm < m_coh_dm_Vector.size(); ++idm)
 	{
+		int nc = 1;
+		auto start = std::chrono::high_resolution_clock::now();
 		dim3 threadsPerBlock(1024, 1, 1);
 		dim3 blocksPerGrid((m_nchan * m_nbin + threadsPerBlock.x - 1) / threadsPerBlock.x, m_nfft, m_npol / 2);
 		element_wise_cufftComplex_mult_kernel << < blocksPerGrid, threadsPerBlock >> >
 			(m_pdcmpbuff_ewmulted,(cufftComplex*)pcmparrRawSignalCur, &m_pd_arr_dc_py[m_nchan * m_nbin * idm], m_npol / 2, m_nfft, m_nchan * m_nbin);
 		cudaDeviceSynchronize();
+
+		auto end = std::chrono::high_resolution_clock::now();
+		auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+		std::cout << "Time taken by function elementWiseMult: " << duration.count() / nc << " microseconds" << std::endl;
 		// result stored in m_pdcmpbuff_ewmulted
 		cudaStatus0 = cudaGetLastError();
 		if (cudaStatus0 != cudaSuccess) {
@@ -359,28 +365,17 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 		//npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
 		//int ii = 0;
 
-		int threads1 = 1024;
-		int blocks1 = (m_npol / 2 * m_nfft * m_nchan * m_nbin + threads1 - 1) / threads1;
-		/*divide_cufftComplex_array_kernel << <blocks1, threads1 >> > ((cufftComplex*)pcmparrRawSignalCur, m_npol / 2 * m_nfft * m_nchan * m_nbin, ((float)m_nbin));
-		cudaDeviceSynchronize();*/
-
 		cudaStatus0 = cudaGetLastError();
 		if (cudaStatus0 != cudaSuccess) {
 			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
 			return false;
 		}
-		/*	int lenarr4 = m_nfft * m_nchan * m_nbin * (m_npol / 2) / 2;
-		std::vector<complex<float>> data4(lenarr4, 0);
-		cudaMemcpy(data4.data(), &((cufftComplex*)pcmparrRawSignalCur)[lenarr4], lenarr4 * sizeof(std::complex<float>), cudaMemcpyDeviceToHost);
-		cudaDeviceSynchronize();
-		std::array<long unsigned, 1> leshape2{ lenarr4 };
-		npy::SaveArrayAsNumpy("pcmparrRawSignalFfted.npy", false, leshape2.size(), leshape2.data(), data4);
-		int ii = 0;*/
+		
 
 		cufftComplex* pcmparrRawSignalRolled1 = NULL;
 		cudaMalloc(&pcmparrRawSignalRolled1, m_nfft * m_nchan * m_npol / 2 * m_nbin * sizeof(cufftComplex));
 		int mbin = get_mbin();
-		dim3 threads(256, 1);
+		dim3 threads(1024, 1);
 		dim3 blocks((mbin + threads.x - 1) / threads.x, m_nfft * m_nchan * m_npol / 2 * m_len_sft);
 		// result stored in m_pdcmpbuff_ewmulted
 		roll_rows_kernel << < blocks, threads >> > (pcmparrRawSignalRolled1, m_pdcmpbuff_ewmulted, m_nfft * m_nchan * m_npol / 2 * m_len_sft, mbin, mbin / 2);
@@ -533,7 +528,21 @@ bool CChunk_py_gpu::process(void* pcmparrRawSignalCur
 	//checkCudaErrors(cudaFree(poutImg));
 	return true;
 }
-		
+//--------------------------------------------------------------------------------
+
+__global__ void roll_rows_kernel(cufftComplex* arr_rez, cufftComplex* arr, int rows, int cols, int shift)
+{
+	int idx0 = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx0 >= cols)
+	{
+		return;
+	}
+	int ind_new = blockIdx.y * cols + (idx0 + shift) % cols;
+	int ind = blockIdx.y * cols + idx0;
+	arr_rez[ind_new].x = arr[ind].x;
+	arr_rez[ind_new].y =  arr[ind].y;
+}
+
 
 
 //

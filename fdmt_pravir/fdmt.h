@@ -7,6 +7,7 @@
 //#include <spdlog/spdlog.h>
 // std:: threads
 
+
 using DtPlan = std::tuple<size_t, size_t, size_t, size_t>;
 using DtGrid = std::vector<size_t>;
 
@@ -74,4 +75,5 @@ private:
     void configure_fdmt_plan();
     void make_fdmt_plan_iter0();
     void make_fdmt_plan(size_t i_iter);
+    void check_inputs(size_t waterfall_size, size_t dmt_size);
 };

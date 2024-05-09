@@ -301,19 +301,24 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 
 		for (int idm = 0; idm < m_coh_dm_Vector.size(); ++idm)
 		{
-			//auto start = std::chrono::high_resolution_clock::now();
-			
+			int nc = 1;
+			auto start = std::chrono::high_resolution_clock::now();
+			for (int inc = 0; inc < nc; ++inc)
+			{
 				elementWiseMult(m_pdcmpbuff_ewmulted, (cufftComplex*)pcmparrRawSignalCur, idm);
-				cudaStatus0 = cudaGetLastError();
-				if (cudaStatus0 != cudaSuccess) {
-					fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-					return false;
-				}
+			}
+				
 
-			/*auto end = std::chrono::high_resolution_clock::now();
+			auto end = std::chrono::high_resolution_clock::now();
 			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-			std::cout << "Time taken by function elementWiseMult: " << duration.count()/nc << " microseconds" << std::endl;*/
-			
+			std::cout << "Time taken by function elementWiseMult: " << duration.count()/nc << " microseconds" << std::endl;
+
+
+			cudaStatus0 = cudaGetLastError();
+			if (cudaStatus0 != cudaSuccess) {
+				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
+				return false;
+			}
 			checkCudaErrors(cufftExecC2C(m_fftPlanInverse, m_pdcmpbuff_ewmulted, m_pdcmpbuff_ewmulted, CUFFT_INVERSE));
 			cudaStatus0 = cudaGetLastError();
 			if (cudaStatus0 != cudaSuccess) {
@@ -706,22 +711,6 @@ __global__ void roll_rows_and_normalize_kernel(cufftComplex* arr_rez, cufftCompl
 
 }
 
-//--------------------------------------------------------------------------------
-
-__global__ void roll_rows_kernel(cufftComplex* arr_rez, cufftComplex* arr, int rows, int cols, int shift)
-{
-
-	int idx0 = blockIdx.x * blockDim.x + threadIdx.x;
-	if (idx0 >= cols)
-	{
-		return;
-	}
-	int ind_new = blockIdx.y * cols + (idx0 + shift) % cols;
-	int ind = blockIdx.y * cols + idx0;
-	arr_rez[ind_new].x = arr[ind].x;
-	arr_rez[ind_new].y = arr[ind].y ;
-
-}
 
 //-----------------------------------------------------------------
 
