@@ -21,6 +21,8 @@
 #include "Fragment.h"
 #include "npy.hpp"
 #include "TelescopeHeader.h"
+
+
 extern cudaError_t cudaStatus0 = cudaErrorInvalidDevice;
 
 

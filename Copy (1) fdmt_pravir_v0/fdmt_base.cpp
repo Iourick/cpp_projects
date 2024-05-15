@@ -55,6 +55,7 @@ FDMT::FDMT(float f_min, float f_max, SizeType nchans, SizeType nsamps,
 // Getters
 float FDMT::get_df() const { return m_df; }
 float FDMT::get_correction() const { return m_correction; }
+
 SizeType FDMT::get_niters() const { return m_niters; }
 const FDMTPlan& FDMT::get_plan() const { return m_fdmt_plan; }
 const DtGridType& FDMT::get_dt_grid_final() const {
@@ -96,8 +97,7 @@ DtGridType FDMT::calculate_dt_grid_sub(float f_start, float f_end) const {
     const auto dt_min_sub = static_cast<SizeType>(
         fdmt::calculate_dt_sub(f_start, f_end, m_f_min, m_f_max, m_dt_min));
     DtGridType dt_grid;
-    for (SizeType dt = dt_min_sub; dt <= dt_max_sub; dt += m_dt_step)
-    {
+    for (SizeType dt = dt_min_sub; dt <= dt_max_sub; dt += m_dt_step) {
         dt_grid.push_back(dt);
     }
     return dt_grid;
@@ -133,7 +133,7 @@ void FDMT::configure_fdmt_plan() {
     for (SizeType i_iter = 1; i_iter < m_niters + 1; ++i_iter) {
         make_fdmt_plan(i_iter);
     }
-    //spdlog::debug("FDMT: configured fdmt plan");
+   // spdlog::debug("FDMT: configured fdmt plan");
 }
 
 void FDMT::make_fdmt_plan_iter0() {

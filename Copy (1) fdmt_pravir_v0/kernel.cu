@@ -1,7 +1,7 @@
 ﻿
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include "FdmtGpu.cuh"
+
 #include <vector>
 #include "npy.hpp"
 #include "kernel.cuh"
@@ -9,8 +9,13 @@
 #include "fileInput.h"
 #include "DrawImg.h"
 #include "Constants.h"
-#include "FdmtCpu.h"
-//#include "FdmtCpu_float.h"
+#include "fdmt_cpu.hpp"
+#include  "fdmt_base.hpp"
+#include "fdmt_gpu.cuh"
+#include <span>
+
+
+
 
 using namespace std;
 enum TYPE_OF_PROCESSOR
@@ -19,7 +24,7 @@ enum TYPE_OF_PROCESSOR
 	, GPU
 };
 
-char strInpFolder[] = "..//FDMT_TESTS//2048";
+char strInpFolder[] = "..//FDMT_TESTS//512";
 char strPathOutImageNpyFile_gpu[] = "out_image_GPU.npy";
 const bool BDIM_512_1024 = true;
 TYPE_OF_PROCESSOR PROCESSOR = GPU;
@@ -51,49 +56,59 @@ int main(int argc, char** argv)
 	// initiating input variables
 	int iMaxDT = 0;
 	int iImRows = 0, iImCols = 0;
+	int iImRows1 = 0, iImCols1 = 0;
 	float val_fmax = 0., val_fmin = 0.;
 	//int  nchan = iImRows;// 400;
 	readDimensions(strInpFolder, &iImRows, &iImCols);
 	// initiate pointer to input image
+	/*iImRows = 4096;
+	iImCols = 1 << 14;*/
+	
 	fdmt_type_* h_parrImage = (fdmt_type_*)malloc(sizeof(fdmt_type_) * iImRows * iImCols);
+	memset(h_parrImage, 0, sizeof(fdmt_type_) * iImRows * iImCols);
 	int ireturn = downloadInputData_gpu(strInpFolder, &iMaxDT, h_parrImage, &iImRows, &iImCols,
 		&val_fmin, &val_fmax);
-
+	
+	iMaxDT = iImRows;
 	fdmt_type_* u_parrImage = NULL;
 	fdmt_type_* u_parrImOut = NULL;
+	float tsamp = 1.0;
+	
+	size_t dt_step = 1;
+	size_t dt_min = 256;
 
-	CFdmtB* pfdmt = nullptr;
-	CFdmtGpu* pfdmt_gpu = nullptr;
-	CFdmtCpu* pfdmt_cpu = nullptr;
+	FDMT* pfdmt_cpu = new FDMTCPU(val_fmin, val_fmax, iImRows, iImCols, tsamp,
+		iMaxDT - 1, dt_step, dt_min);
+	const size_t IOutImageRows = pfdmt_cpu->get_dt_grid_final().size();
+	delete pfdmt_cpu;
+
+
+	FDMT* pfdmt = nullptr;
+	
+	
+	size_t dmt_size = IOutImageRows * iImCols;
+	u_parrImOut = (fdmt_type_*)malloc(dmt_size * sizeof(fdmt_type_));
 	if (PROCESSOR == GPU)
 	{
 		cudaMalloc(&u_parrImage, sizeof(fdmt_type_) * iImRows * iImCols);
 		cudaMemcpy(u_parrImage, h_parrImage, sizeof(fdmt_type_) * iImRows * iImCols, cudaMemcpyHostToDevice);
-		cudaMallocManaged(&u_parrImOut, iImCols * iMaxDT * sizeof(fdmt_type_));
-		pfdmt = new CFdmtGpu(
-			val_fmin
-			, val_fmax
-			, iImRows
-			, iImCols
-			, iMaxDT
-		);
+		cudaMallocManaged(&u_parrImOut, iImCols * IOutImageRows * sizeof(fdmt_type_));
+		pfdmt = new FDMTGPU(val_fmin, val_fmax, iImRows, iImCols, tsamp,
+			iMaxDT - 1, dt_step, dt_min);
+		
 	}
 	else
 	{
 		u_parrImage = (fdmt_type_*)malloc(sizeof(fdmt_type_) * iImRows * iImCols);
 		memcpy(u_parrImage, h_parrImage, sizeof(fdmt_type_) * iImRows * iImCols);
-		u_parrImOut = (fdmt_type_*)malloc(sizeof(fdmt_type_) * iMaxDT * iImCols);
-		pfdmt = new CFdmtCpu(
-			val_fmin
-			, val_fmax
-			, iImRows
-			, iImCols
-			, iMaxDT
-		);
+		u_parrImOut = (fdmt_type_*)malloc(sizeof(fdmt_type_) * IOutImageRows * iImCols);
+		pfdmt = new FDMTCPU(val_fmin, val_fmax, iImRows, iImCols, tsamp,
+			iMaxDT - 1, dt_step, dt_min);
+		
 	}
 	free(h_parrImage);
 	
-	iMaxDT = iMaxDT ;//iMaxDT * 3 +10;//iMaxDT//;	
+	iMaxDT = iMaxDT ;
 
 	//--------------------------------------------------------------------------------------------------------------
 	//-------------------- end of prepare ------------------------------------------------------------------------------------------
@@ -103,14 +118,16 @@ int main(int argc, char** argv)
 	
 	
 	// 3. calculations		
-	int num = 100;
+	int num = 1;
 	auto start = std::chrono::high_resolution_clock::now();
 
 	for (int i = 0; i < num; ++i)
 	{
-		pfdmt->process_image(u_parrImage       // on-device input image			
+		pfdmt->execute(u_parrImage       // on-device input image
+			, iImRows * iImCols
 			, u_parrImOut	// OUTPUT image, dim = IMaxDT x IImgcols
-			, false);
+			, dmt_size
+			);
 		
 	}
 	
@@ -122,27 +139,27 @@ int main(int argc, char** argv)
 	// !3
 	
 	//4. write  output in .npy:IImgcols * IMaxDT * sizeof(int));
-	cudaDeviceSynchronize();
-	fdmt_type_* parrImOut = (fdmt_type_*)malloc(iImCols * iMaxDT * sizeof(fdmt_type_));
+	//cudaDeviceSynchronize();
+	fdmt_type_* parrImOut = (fdmt_type_*)malloc(iImCols * IOutImageRows * sizeof(fdmt_type_));
 
 	if (PROCESSOR == GPU)
 	{		
-		cudaMemcpy(parrImOut, u_parrImOut, iImCols * iMaxDT * sizeof(fdmt_type_), cudaMemcpyDeviceToHost);
+		cudaMemcpy(parrImOut, u_parrImOut, iImCols * IOutImageRows * sizeof(fdmt_type_), cudaMemcpyDeviceToHost);
 	}
 	else
 	{
-		memcpy(parrImOut, u_parrImOut, iImCols * iMaxDT * sizeof(fdmt_type_));
+		memcpy(parrImOut, u_parrImOut, iImCols * IOutImageRows * sizeof(fdmt_type_));
 	}
 	
 
 	//std::vector<float> v1(parrImOut, parrImOut + iImCols * iMaxDT);
-	std::vector<float> v1(iImCols * iMaxDT);
-	for (int i = 0; i < iImCols * iMaxDT; ++i)
+	std::vector<float> v1(iImCols * IOutImageRows);
+	for (int i = 0; i < iImCols * IOutImageRows; ++i)
 	{
 		v1.at(i) = (float)parrImOut[i];
 	}
 
-	std::array<long unsigned, 2> leshape101{ iImCols ,iMaxDT};
+	std::array<long unsigned, 2> leshape101{ iImCols ,IOutImageRows };
 
 	npy::SaveArrayAsNumpy(strPathOutImageNpyFile_gpu, false, leshape101.size(), leshape101.data(), v1);
 
@@ -190,7 +207,7 @@ int main(int argc, char** argv)
 	
 
 	char filename_cpu[] = "image_gpu.png";
-	createImg_(argc, argv, v1, iMaxDT, iImCols, filename_cpu);
+	createImg_(argc, argv, v1, IOutImageRows, iImCols, filename_cpu);
 
 	return 0;
 }

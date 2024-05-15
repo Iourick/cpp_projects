@@ -11,9 +11,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{2B42DF9A-3332-423D-9EEB-33B13142CC54}</ProjectGuid>
-    <RootNamespace>fdmt_pravir</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectGuid>{60173FF7-F2B4-44F5-AFFB-E83A397382F3}</ProjectGuid>
+    <RootNamespace>CudaRuntime2</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -42,36 +41,21 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\MyVSLib_C++;..\MyVSLib_C++\FDMT;..\freeglut\include;$(IncludePath)</IncludePath>
-    <LibraryPath>..\Dependencies\freeglut\lib\x64;$(LibraryPath)</LibraryPath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>..\MyVSLib_C++;..\MyVSLib_C++\FDMT;..\freeglut\include;$(IncludePath)</IncludePath>
-    <LibraryPath>..\Dependencies\freeglut\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir);..\Dependencies\freeglut\include;..\MyVSLib_C++;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;ILUT.lib;ILU.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;freeglut.lib;DevIL.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <FastMath>false</FastMath>
-      <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
-      <AdditionalOptions>--use_fast_math %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
-    <PostBuildEvent>
-      <Command>copy "..\Dependencies\freeglut\bin\$(Platform)" "$(OutDir)"
-</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -79,55 +63,21 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;USE_OPENMP;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir);..\Dependencies\freeglut\include;..\MyVSLib_C++;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <OpenMPSupport>true</OpenMPSupport>
+      <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;ILUT.lib;ILU.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;freeglut.lib;DevIL.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <FastMath>false</FastMath>
-      <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
-      <AdditionalOptions>--use_fast_math %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
-    <PostBuildEvent>
-      <Command>copy "..\Dependencies\freeglut\bin\$(Platform)" "$(OutDir)"
-</Command>
-    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CudaCompile Include="fdmt_gpu.cu" />
     <CudaCompile Include="kernel.cu" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="..\Dependencies\freeglut\include\GL\freeglut.h" />
-    <ClInclude Include="..\Dependencies\freeglut\include\GL\glut.h" />
-    <ClInclude Include="..\MyVSLib_C++\Constants.h" />
-    <ClInclude Include="..\MyVSLib_C++\DrawImg.h" />
-    <ClInclude Include="..\MyVSLib_C++\fileInput.h" />
-    <ClInclude Include="..\MyVSLib_C++\npy.hpp" />
-    <ClInclude Include="..\MyVSLib_C++\yr_cart.h" />
-    <ClInclude Include="Dependencies\freeglut\include\IL\devil_internal_exports.h" />
-    <ClInclude Include="fdmt_base.hpp" />
-    <ClInclude Include="fdmt_cpu.hpp" />
-    <ClInclude Include="fdmt_gpu.hpp" />
-    <ClInclude Include="fdmt_utils.hpp" />
-    <ClInclude Include="kernel.cuh" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\MyVSLib_C++\DrawImg.cpp" />
-    <ClCompile Include="..\MyVSLib_C++\fileInput.cpp" />
-    <ClCompile Include="..\MyVSLib_C++\yr_cart.cpp" />
-    <ClCompile Include="fdmt_base.cpp" />
-    <ClCompile Include="fdmt_cpu.cpp" />
-    <ClCompile Include="fdmt_utils.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
