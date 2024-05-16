@@ -13,32 +13,8 @@ struct FDMTCoordMappingD {
     int offset;
 };
 
-//struct FDMTPlanD {
-//    thrust::device_vector<int> nsubs_d;
-//    thrust::device_vector<int> ncoords_d;
-//    thrust::device_vector<int> ncoords_to_copy_d;
-//    thrust::device_vector<int> nsubs_cumul_d;
-//    thrust::device_vector<int> ncoords_cumul_d;
-//    thrust::device_vector<int> ncoords_to_copy_cumul_d;
-//    // i = i_iter
-//    thrust::device_vector<StShapeTypeD> state_shape_d;
-//    // i = i_iter * ncoords_cumul_iter + i_coord
-//    thrust::device_vector<FDMTCoordTypeD> coordinates_d;
-//    thrust::device_vector<FDMTCoordMappingD> mappings_d;
-//    // i = i_iter * ncoords_to_copy_cumul_iter + i_coord_to_copy
-//    thrust::device_vector<FDMTCoordTypeD> coordinates_to_copy_d;
-//    thrust::device_vector<FDMTCoordMappingD> mappings_to_copy_d;
-//    // i = i_iter * nsubs_cumul_iter + isub
-//    thrust::device_vector<int> state_sub_idx_d;
-//};
 struct FDMTPlanD
-{
-    // lets implement variable : const int NUmIter = m_niters +1;
-    // it is vector consisting of inner vectors. each inner vector contains 5 elements type of int
-    // so, lets declare : size_t length = state_shape_d.size();
-    // keeping in mind that structure StShapeType consists of 5 elements, we can reach element j of 
-    // prototype state_shape  by j*5 indexing
-    thrust::device_vector<int> state_shape_d;
+{   
 
     // is analogue of std::vector<std::vector<FDMTCoordType>> coordinates;
     // "coordinates_d" is flattened vector "coordinates" 
@@ -51,11 +27,11 @@ struct FDMTPlanD
     // ...
     // Remember that always:  len_inner_vects_coordinates_cumsum.size() = NUmIter +1
     thrust::device_vector<int> coordinates_d;
-    thrust::device_vector<int> lenof_innerVects_coords_cumsum;
+    std::vector<int> lenof_innerVects_coords_cumsum_h;
 
     // Is an analogues as previous
     thrust::device_vector<int> coordinates_to_copy_d;
-    thrust::device_vector<int> lenof_innerVects_coords_to_copy_cumsum;
+    std::vector<int> lenof_innerVects_coords_to_copy_cumsum_h;
 
 
     // It is analogue of:   std::vector<std::vector<FDMTCoordMapping>> mappings;
@@ -70,25 +46,26 @@ struct FDMTPlanD
     // ...
     // Remember that always:  len_mappings_cumsum.size() = NUmIter +1
     thrust::device_vector<int> mappings_d;
-    thrust::device_vector<int> len_mappings_cumsum;
+    std::vector<int> len_mappings_cumsum_h;
 
 
     // Is an analogues as previous
     thrust::device_vector<int> mappings_to_copy_d;
-    thrust::device_vector<int> len_mappings_to_copy_cumsum;
+    std::vector<int> len_mappings_to_copy_cumsum_h;
 
 
     // It is analogue of state_sub_idx
     // Has size: state_sub_idx_d.size() = m_niters +1
     thrust::device_vector<int>state_sub_idx_d;
-    thrust::device_vector<int> len_state_sub_idx_cumsum;
+    std::vector<int> len_state_sub_idx_cumsum_h;
 
 
     // It is analogue of dt_grid
     // Has size: dt_grid_d.size() = m_niters +1
     thrust::device_vector<int>dt_grid_d;
-    thrust::device_vector<int> pos_gridSubVects;
-    thrust::device_vector<int> pos_gridInnerVects;
+    thrust::device_vector<int> pos_gridInnerVects_d;
+    std::vector<int> pos_gridSubVects_h;
+    
 };
 class FDMTGPU : public FDMT {
 public:
@@ -119,7 +96,25 @@ void  kernel_init_fdmt(const float* waterfall, int* p_state_sub_idx
     , int* p_dt_grid, int* p_pos_gridInnerVects, float* state, const int nsamps);
 
 __global__
+void  kernel_init_fdmt_v1(const float* waterfall, int* p_state_sub_idx
+    , int* p_dt_grid, int* p_pos_gridInnerVects, float* state, const int nsamps);
+
+__global__
 void kernel_execute_iter(const float* state_in, float* state_out
+    , int* pcoords_cur//+   
+    , int* pmappings_cur //+
+    , int* pcoords_copy_cur //+
+    , int* pmappings_copy_cur //+
+    , int* pstate_sub_idx_cur //+
+    , int* pstate_sub_idx_prev//+
+    , int nsamps //+
+    , int  coords_cur_size//+
+    , int  coords_copy_cur_size//+
+);
+
+
+__global__
+void kernel_execute_iter_v1(const float* state_in, float* state_out
     , int* pcoords_cur//+   
     , int* pmappings_cur //+
     , int* pcoords_copy_cur //+

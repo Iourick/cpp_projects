@@ -33,13 +33,13 @@ void FDMTCPU::execute(const float* waterfall, size_t waterfall_size, float* dmt,
 
     initialise(waterfall, state_in_ptr);
 
-    const auto& plan = get_plan();
+   /* const auto& plan = get_plan();
     int lenarr4 = plan.state_shape[0][3] * plan.state_shape[0][4];
     std::vector<float> data4(lenarr4, 0);
     memcpy(data4.data(), state_in_ptr, lenarr4 * sizeof(float));
     
     std::array<long unsigned, 1> leshape2{ lenarr4 };
-    npy::SaveArrayAsNumpy("state_cpu.npy", false, leshape2.size(), leshape2.data(), data4);
+    npy::SaveArrayAsNumpy("state_cpu.npy", false, leshape2.size(), leshape2.data(), data4);*/
 
     const auto niters = get_niters();
     for (size_t i_iter = 1; i_iter < niters + 1; ++i_iter) {
@@ -57,17 +57,17 @@ void FDMTCPU::initialise(const float* waterfall, float* state)
     const auto& dt_grid_init       = plan.dt_grid[0];
     const auto& state_sub_idx_init = plan.state_sub_idx[0];
     const auto& nsamps             = plan.state_shape[0][4];
-//#ifdef USE_OPENMP
-//#pragma omp parallel for default(none)                                         \
-//    shared(waterfall, state, dt_grid_init, state_sub_idx_init, nsamps)
-//#endif
-    for (size_t i_sub = 0; i_sub < dt_grid_init.size(); ++i_sub)
+#ifdef USE_OPENMP
+#pragma omp parallel for default(none)                                         \
+    shared(waterfall, state, dt_grid_init, state_sub_idx_init, nsamps)
+#endif
+    for (int i_sub = 0; i_sub < dt_grid_init.size(); ++i_sub)
     {
         const auto& dt_grid_sub = dt_grid_init[i_sub];
         const auto& state_sub_idx = state_sub_idx_init[i_sub];
         // Initialise state for [:, dt_init_min, dt_init_min:]
         const auto& dt_grid_sub_min = dt_grid_sub[0];
-        for (size_t isamp = dt_grid_sub_min; isamp < nsamps; ++isamp)
+        for (int isamp = dt_grid_sub_min; isamp < nsamps; ++isamp)
         {
             float sum = 0.0F;
 
@@ -79,14 +79,14 @@ void FDMTCPU::initialise(const float* waterfall, float* state)
                 sum / static_cast<float>(dt_grid_sub_min + 1);
            
             // Initialise state for [:, dt_grid_init[i_dt], dt_grid_init[i_dt]:]
-            for (size_t i_dt = 1; i_dt < dt_grid_sub.size(); ++i_dt)
+            for (int i_dt = 1; i_dt < dt_grid_sub.size(); ++i_dt)
             {
                 const auto dt_cur = dt_grid_sub[i_dt];
                 const auto dt_prev = dt_grid_sub[i_dt - 1];
-                for (size_t isamp = dt_cur; isamp < nsamps; ++isamp)
+                for (int isamp = dt_cur; isamp < nsamps; ++isamp)
                 {
                     float sum = 0.0F;
-                    for (size_t i = isamp - dt_cur; i < isamp - dt_prev; ++i)
+                    for (int i = isamp - dt_cur; i < isamp - dt_prev; ++i)
                     {
                         sum += waterfall[i_sub * nsamps + i];
                     }
@@ -114,12 +114,12 @@ void FDMTCPU::execute_iter(const float* state_in, float* state_out,
     const auto& state_sub_idx_cur  = plan.state_sub_idx[i_iter];
     const auto& state_sub_idx_prev = plan.state_sub_idx[i_iter - 1];
 
-//#ifdef USE_OPENMP
-//#pragma omp parallel for default(none)                                         \
-//    shared(state_in, state_out, coords_cur, mappings_cur, state_sub_idx_cur,   \
-//               state_sub_idx_prev, nsamps)
-//#endif
-    for (size_t i_coord = 0; i_coord < coords_cur.size(); ++i_coord)
+#ifdef USE_OPENMP
+#pragma omp parallel for default(none)                                         \
+    shared(state_in, state_out, coords_cur, mappings_cur, state_sub_idx_cur,   \
+               state_sub_idx_prev, nsamps)
+#endif
+    for (int i_coord = 0; i_coord < coords_cur.size(); ++i_coord)
     {
         
         const auto& i_sub              = coords_cur[i_coord].first;
@@ -139,12 +139,12 @@ void FDMTCPU::execute_iter(const float* state_in, float* state_out,
         fdmt::add_offset_kernel(tail, nsamps, head, nsamps, out, nsamps,
                                 offset);       
     }
-//#ifdef USE_OPENMP
-//#pragma omp parallel for default(none)                                         \
-//    shared(state_in, state_out, coords_copy_cur, mappings_copy_cur,            \
-//               state_sub_idx_cur, state_sub_idx_prev, nsamps)
-//#endif
-    for (size_t i_coord = 0; i_coord < coords_copy_cur.size(); ++i_coord) {
+#ifdef USE_OPENMP
+#pragma omp parallel for default(none)                                         \
+    shared(state_in, state_out, coords_copy_cur, mappings_copy_cur,            \
+               state_sub_idx_cur, state_sub_idx_prev, nsamps)
+#endif
+    for (int i_coord = 0; i_coord < coords_copy_cur.size(); ++i_coord) {
         const auto& i_sub              = coords_copy_cur[i_coord].first;
         const auto& i_dt               = coords_copy_cur[i_coord].second;
         const auto& i_sub_tail         = mappings_copy_cur[i_coord].tail.first;

@@ -24,7 +24,7 @@ enum TYPE_OF_PROCESSOR
 	, GPU
 };
 
-char strInpFolder[] = "..//FDMT_TESTS//512";
+char strInpFolder[] = "..//FDMT_TESTS//2048";
 char strPathOutImageNpyFile_gpu[] = "out_image_GPU.npy";
 const bool BDIM_512_1024 = true;
 TYPE_OF_PROCESSOR PROCESSOR = GPU;
@@ -61,21 +61,22 @@ int main(int argc, char** argv)
 	//int  nchan = iImRows;// 400;
 	readDimensions(strInpFolder, &iImRows, &iImCols);
 	// initiate pointer to input image
-	/*iImRows = 4096;
-	iImCols = 1 << 14;*/
+	iImRows = 2048;
+	iImCols = 1 << 18;
 	
 	fdmt_type_* h_parrImage = (fdmt_type_*)malloc(sizeof(fdmt_type_) * iImRows * iImCols);
 	memset(h_parrImage, 0, sizeof(fdmt_type_) * iImRows * iImCols);
 	int ireturn = downloadInputData_gpu(strInpFolder, &iMaxDT, h_parrImage, &iImRows, &iImCols,
 		&val_fmin, &val_fmax);
-	
+	iImRows = 2048;
+	iImCols = 1 << 18;
 	iMaxDT = iImRows;
 	fdmt_type_* u_parrImage = NULL;
 	fdmt_type_* u_parrImOut = NULL;
 	float tsamp = 1.0;
 	
-	size_t dt_step = 2;
-	size_t dt_min = 80;
+	size_t dt_step = 1;
+	size_t dt_min = 0;
 
 	FDMT* pfdmt_cpu = new FDMTCPU(val_fmin, val_fmax, iImRows, iImCols, tsamp,
 		iMaxDT - 1, dt_step, dt_min);
@@ -112,9 +113,9 @@ int main(int argc, char** argv)
 	//--------------------------------------------------------------------------------------------------------------
 	//iImCols = 1 << 18;
 	
-	
+	std::cout << "timing begin" << std::endl;
 	// 3. calculations		
-	int num = 1;
+	int num = 10;
 	auto start = std::chrono::high_resolution_clock::now();
 
 	for (int i = 0; i < num; ++i)
