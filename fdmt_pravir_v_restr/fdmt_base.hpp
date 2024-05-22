@@ -5,7 +5,7 @@
 #include <utility>
 #include <vector>
 
-using SizeType = int;// size_t;
+using SizeType   = size_t;
 using DtGridType = std::vector<SizeType>;
 // state shape: nchans, ndt_min, ndt_max, ncoords, nsamps
 using StShapeType   = std::array<SizeType, 5>;
@@ -46,14 +46,15 @@ public:
     virtual ~FDMT()              = default;
     float get_df() const;
     float get_correction() const;
+    int get_m_nsamps() const;
     SizeType get_niters() const;
     const FDMTPlan& get_plan() const;
     const DtGridType& get_dt_grid_final() const;
     std::vector<float> get_dm_grid_final() const;
     //static void set_log_level(int level);
-    virtual void execute(const float* waterfall, size_t waterfall_size,
-                         float* dmt, size_t dmt_size)             = 0;
-    virtual void initialise(const float* waterfall, float* state) = 0;
+    virtual void execute(const float* __restrict waterfall, size_t waterfall_size,
+                         float* __restrict dmt, size_t dmt_size)             = 0;
+    virtual void initialise(const float* __restrict waterfall, float* __restrict state) = 0;
 
     
     

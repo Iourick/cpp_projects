@@ -5,6 +5,7 @@
 
 #include "npy.hpp" //! delete_
 
+
 extern cudaError_t cudaStatus0 = cudaSuccess;
 
 FDMTGPU::FDMTGPU(float f_min, float f_max, size_t nchans, size_t nsamps,
@@ -250,17 +251,18 @@ void  FDMTGPU::execute(const float* waterfall, size_t waterfall_size, float* dmt
     int* pstate_sub_idx_cur = &pstate_sub_idx[m_fdmt_plan_d.len_state_sub_idx_cumsum_h[0]]; //+
 
     int* ppos_gridInnerVects_cur = &ppos_gridInnerVects[m_fdmt_plan_d.pos_gridSubVects_h[0]]; //+
-    const dim3 blockSize = dim3(1024, 1);
-    const dim3 gridSize = dim3((nsamps + blockSize.x - 1) / blockSize.x, nchan);
+    const dim3 blockSize = dim3(256, 1);
+    const dim3 gridSize = dim3((nsamps + blockSize.x - 1) / blockSize.x,nchan);
 
-    auto start = std::chrono::high_resolution_clock::now();
-    kernel_init_fdmt_v1 << < gridSize, blockSize >> > (waterfall, pstate_sub_idx_cur, pdt_grid
-        , ppos_gridInnerVects_cur, state_in_ptr, nsamps);
-    cudaDeviceSynchronize();
-
+    auto start = std::chrono::high_resolution_clock::now();    
+    
+        kernel_init_fdmt_v1 << < gridSize, blockSize >> > (waterfall, pstate_sub_idx_cur, pdt_grid
+            , ppos_gridInnerVects_cur, state_in_ptr, nsamps);
+        cudaDeviceSynchronize(); 
+   
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "  Time taken by function initialise : " << duration.count() << " microseconds" << std::endl;
+   // std::cout << "  Time taken by function initialise : " << duration.count() << " microseconds" << std::endl;
 
   /*  int lenarr4 = plan.state_shape[0][3] * plan.state_shape[0][4];
     std::vector<float> data4(lenarr4, 0);
@@ -315,8 +317,6 @@ void  FDMTGPU::execute(const float* waterfall, size_t waterfall_size, float* dmt
 
         const dim3 blockSize = dim3(1024, 1);
         const dim3 gridSize = dim3((nsamps + blockSize.x - 1) / blockSize.x, coords_max);
-
-       
          kernel_execute_iter_v1 << < gridSize, blockSize >> > (state_in_ptr, state_out_ptr
           , pcoords_cur
           , pmappings_cur
@@ -329,9 +329,6 @@ void  FDMTGPU::execute(const float* waterfall, size_t waterfall_size, float* dmt
           , coords_copy_cur_size
           );
         cudaDeviceSynchronize();
-
-        
-
         cudaStatus0 = cudaGetLastError();
         if (cudaStatus0 != cudaSuccess)
         {
@@ -355,8 +352,8 @@ void  FDMTGPU::initialise(const float* waterfall, float* state)
  }
 //--------------------------------------------------------------
 __global__
-void  kernel_init_fdmt(const float* waterfall, int* pstate_sub_idx_cur
-    , int* p_dt_grid, int* ppos_gridInnerVects_cur, float* state, const int nsamps)
+void  kernel_init_fdmt(const float* __restrict waterfall, int* __restrict pstate_sub_idx_cur
+    , int* __restrict p_dt_grid, int* __restrict ppos_gridInnerVects_cur, float* __restrict state, const int nsamps)
 {
     int isamp = blockIdx.x * blockDim.x + threadIdx.x;
     if (isamp >= nsamps)
@@ -378,6 +375,10 @@ void  kernel_init_fdmt(const float* waterfall, int* pstate_sub_idx_cur
         }
         state[state_sub_idx + isamp] = sum / static_cast<float>(dt_grid_sub_min + 1);
     }
+    else
+    {
+        state[state_sub_idx + isamp] = 0.0F;
+    }
     ////---
     int  dt_grid_sub_size = ppos_gridInnerVects_cur[i_sub + 1] - ppos_gridInnerVects_cur[i_sub];
 
@@ -395,19 +396,18 @@ void  kernel_init_fdmt(const float* waterfall, int* pstate_sub_idx_cur
             state[state_sub_idx + i_dt * nsamps + isamp] = (state[state_sub_idx + (i_dt - 1) * nsamps + isamp] *
                 (static_cast<float>(dt_prev) + 1.0F) + sum) / (static_cast<float>(dt_cur) + 1.0F);
         }
-        else
-        {
-            state[state_sub_idx + i_dt * nsamps + isamp] = 0.0F;  // ???? rid of it???
-        }
+        
     }
 }
 
+
+
 //--------------------------------------------------------------
 __global__
-void  kernel_init_fdmt_v1(const float* waterfall, int* pstate_sub_idx_cur
-    , int* p_dt_grid, int* ppos_gridInnerVects_cur, float* state, const int nsamps)
+void  kernel_init_fdmt_v1(const float* __restrict waterfall, int* __restrict pstate_sub_idx_cur
+    , int* __restrict p_dt_grid, int* __restrict ppos_gridInnerVects_cur, float* __restrict state, const int nsamps)
 {
-    __shared__ int iarr_sh[4];
+   __shared__ int iarr_sh[4];
     int isamp = blockIdx.x * blockDim.x + threadIdx.x;
     if (isamp >= nsamps)
     {
@@ -432,10 +432,9 @@ void  kernel_init_fdmt_v1(const float* waterfall, int* pstate_sub_idx_cur
         {
             sum += waterfall[i_sub * nsamps + i];
         }
-        state[iarr_sh[1] + isamp] = sum / static_cast<float>(iarr_sh[0] + 1);
+        state[iarr_sh[1] + isamp] = fdividef(sum, static_cast<float>(iarr_sh[0] + 1))  ;
     }
-    ////---
-    
+    //---   
 
     for (int i_dt = 1; i_dt < iarr_sh[2]; ++i_dt)
     {
@@ -448,24 +447,23 @@ void  kernel_init_fdmt_v1(const float* waterfall, int* pstate_sub_idx_cur
             {
                 sum += waterfall[i_sub * nsamps + i];
             }
-            state[iarr_sh[1] + i_dt * nsamps + isamp] = (state[iarr_sh[1] + (i_dt - 1) * nsamps + isamp] *
-                (static_cast<float>(dt_prev) + 1.0F) + sum) / (static_cast<float>(dt_cur) + 1.0F);
+            state[iarr_sh[1] + i_dt * nsamps + isamp] = state[iarr_sh[1] + (i_dt - 1) * nsamps + isamp] *
+                fdividef(static_cast<float>(dt_prev) + 1.0F + sum, static_cast<float>(dt_cur) + 1.0F) ;
         }
-        //else
-        //{
-        //    state[iarr_sh[1] + i_dt * nsamps + isamp] = 0.0F;  // ???? rid of it???
-        //}
+        
     }
+
+
 }
 //--------------------------------------------------------------------------------------
 __global__
-void kernel_execute_iter(const float* state_in, float* state_out
-    , int* pcoords_cur//+   
-    , int* pmappings_cur //+
-    , int* pcoords_copy_cur //+
-    , int* pmappings_copy_cur //+
-    , int* pstate_sub_idx_cur //+
-    , int* pstate_sub_idx_prev//+
+void kernel_execute_iter(const float* __restrict state_in, float* __restrict state_out
+    , int* __restrict pcoords_cur//+   
+    , int* __restrict pmappings_cur //+
+    , int* __restrict pcoords_copy_cur //+
+    , int* __restrict pmappings_copy_cur //+
+    , int* __restrict pstate_sub_idx_cur //+
+    , int* __restrict pstate_sub_idx_prev//+
     , int nsamps //+
     , int  coords_cur_size//+
     , int  coords_copy_cur_size//+
@@ -492,9 +490,9 @@ void kernel_execute_iter(const float* state_in, float* state_out
         int state_sub_idx_tail = pstate_sub_idx_prev[i_sub_tail];
         int state_sub_idx_head = pstate_sub_idx_prev[i_sub_head];
 
-        const float* tail = &state_in[state_sub_idx_tail + i_dt_tail * nsamps];
-        const float* head = &state_in[state_sub_idx_head + i_dt_head * nsamps];
-        float* out = &state_out[state_sub_idx + i_dt * nsamps];
+        const float* __restrict tail = &state_in[state_sub_idx_tail + i_dt_tail * nsamps];
+        const float* __restrict head = &state_in[state_sub_idx_head + i_dt_head * nsamps];
+        float* __restrict out = &state_out[state_sub_idx + i_dt * nsamps];
         if (isamp < offset)
         {
             out[isamp] = tail[isamp];
@@ -515,20 +513,96 @@ void kernel_execute_iter(const float* state_in, float* state_out
         int state_sub_idx = pstate_sub_idx_cur[i_sub];
         int state_sub_idx_tail = pstate_sub_idx_prev[i_sub_tail];
 
-        const float* tail = &state_in[state_sub_idx_tail + i_dt_tail * nsamps];
-        float* out = &state_out[state_sub_idx + i_dt * nsamps];
+        const float* __restrict tail = &state_in[state_sub_idx_tail + i_dt_tail * nsamps];
+        float* __restrict out = &state_out[state_sub_idx + i_dt * nsamps];
         out[isamp] = tail[isamp];
     }
 }
+////--------------------------------------------------------------------------------------
+//__global__
+//void kernel_execute_iter_v1(const float* __restrict state_in, float* __restrict state_out
+//    , int* __restrict pcoords_cur//+   
+//    , int* __restrict pmappings_cur //+
+//    , int* __restrict pcoords_copy_cur //+
+//    , int* __restrict pmappings_copy_cur //+
+//    , int* __restrict pstate_sub_idx_cur //+
+//    , int* __restrict pstate_sub_idx_prev//+
+//    , int nsamps //+
+//    , int  coords_cur_size//+
+//    , int  coords_copy_cur_size//+
+//)
+//{
+//    __shared__ int iarr_sh[6];
+//    int  i_coord = blockIdx.y;
+//
+//    int isamp = blockIdx.x * blockDim.x + threadIdx.x;
+//    if (isamp >= nsamps)
+//    {
+//        return;
+//    }
+//
+//    if (i_coord < coords_cur_size)
+//    {
+//        int i_sub = pcoords_cur[i_coord * 2];
+//        int i_dt = pcoords_cur[i_coord * 2 + 1];
+//        int i_sub_tail = pmappings_cur[i_coord * 5];
+//        int i_dt_tail = pmappings_cur[i_coord * 5 + 1];
+//        int i_sub_head = pmappings_cur[i_coord * 5 + 2];
+//        int i_dt_head = pmappings_cur[i_coord * 5 + 3];
+//       
+//        int state_sub_idx = pstate_sub_idx_cur[i_sub];
+//        int state_sub_idx_tail = pstate_sub_idx_prev[i_sub_tail];
+//        int state_sub_idx_head = pstate_sub_idx_prev[i_sub_head];
+//
+//        iarr_sh[0] = state_sub_idx_tail + i_dt_tail * nsamps;
+//        iarr_sh[1] = state_sub_idx_head + i_dt_head * nsamps;
+//        iarr_sh[2] = state_sub_idx + i_dt * nsamps;
+//        iarr_sh[3] = pmappings_cur[i_coord * 5 + 4]; // offset
+//        //---
+//       // const float* tail = &state_in[iarr_sh[0]];
+//       // const float* head = &state_in[iarr_sh[1]];
+//       // float* out = &state_out[iarr_sh[2]];
+//        if (isamp < iarr_sh[3])
+//        {
+//            state_out[iarr_sh[2] + isamp] = state_in[iarr_sh[0] + isamp];
+//           
+//        }
+//        else
+//        {
+//            state_out[iarr_sh[2] + isamp] = state_in[iarr_sh[0] + isamp] + state_in[iarr_sh[1] + isamp - iarr_sh[3]];
+//        }
+//    }
+//    __syncthreads();
+//
+//    if (i_coord < coords_copy_cur_size)
+//    {
+//        int i_sub = pcoords_copy_cur[i_coord * 2];
+//        int i_dt = pcoords_copy_cur[i_coord * 2 + 1];
+//        int i_sub_tail = pmappings_copy_cur[i_coord * 5];
+//        int i_dt_tail = pmappings_copy_cur[i_coord * 5 + 1];
+//        int state_sub_idx = pstate_sub_idx_cur[i_sub];
+//        int state_sub_idx_tail = pstate_sub_idx_prev[i_sub_tail];
+//
+//        iarr_sh[4] = state_sub_idx_tail + i_dt_tail * nsamps;
+//        iarr_sh[5] = state_sub_idx + i_dt * nsamps;
+//        //--
+//
+//       // const float* tail = &state_in[iarr_sh[4]];
+//       // float* out = &state_out[iarr_sh[5]];
+//        state_out[iarr_sh[5] + isamp] =  state_in[iarr_sh[4] + isamp] ;
+//        //out[isamp] = tail[isamp];
+//    }
+//}
+
 //--------------------------------------------------------------------------------------
 __global__
-void kernel_execute_iter_v1(const float* state_in, float* state_out
-    , int* pcoords_cur//+   
-    , int* pmappings_cur //+
-    , int* pcoords_copy_cur //+
-    , int* pmappings_copy_cur //+
-    , int* pstate_sub_idx_cur //+
-    , int* pstate_sub_idx_prev//+
+void kernel_execute_iter_v1(const float* __restrict state_in, float* __restrict state_out
+    , int* __restrict pcoords_cur//+   
+    , int* __restrict pmappings_cur //+
+    , int* __restrict pcoords_copy_cur //+
+    , int* __restrict pmappings_copy_cur //+
+    , int* __restrict pstate_sub_idx_cur //+
+    , int* __restrict pstate_sub_idx_prev//+
     , int nsamps //+
     , int  coords_cur_size//+
     , int  coords_copy_cur_size//+
@@ -545,29 +619,19 @@ void kernel_execute_iter_v1(const float* state_in, float* state_out
 
     if (i_coord < coords_cur_size)
     {
-        int i_sub = pcoords_cur[i_coord * 2];
-        int i_dt = pcoords_cur[i_coord * 2 + 1];
-        int i_sub_tail = pmappings_cur[i_coord * 5];
-        int i_dt_tail = pmappings_cur[i_coord * 5 + 1];
-        int i_sub_head = pmappings_cur[i_coord * 5 + 2];
-        int i_dt_head = pmappings_cur[i_coord * 5 + 3];
-       
-        int state_sub_idx = pstate_sub_idx_cur[i_sub];
-        int state_sub_idx_tail = pstate_sub_idx_prev[i_sub_tail];
-        int state_sub_idx_head = pstate_sub_idx_prev[i_sub_head];
+        int i_sub = pcoords_cur[i_coord * 2];     
 
-        iarr_sh[0] = state_sub_idx_tail + i_dt_tail * nsamps;
-        iarr_sh[1] = state_sub_idx_head + i_dt_head * nsamps;
-        iarr_sh[2] = state_sub_idx + i_dt * nsamps;
+        int state_sub_idx = pstate_sub_idx_cur[i_sub];     
+
+        iarr_sh[0] = pstate_sub_idx_prev[pmappings_cur[i_coord * 5]] + pmappings_cur[i_coord * 5 + 1] * nsamps;
+        iarr_sh[1] = pstate_sub_idx_prev[pmappings_cur[i_coord * 5 + 2]] + pmappings_cur[i_coord * 5 + 3] * nsamps;
+        iarr_sh[2] = pstate_sub_idx_cur[i_sub] + pcoords_cur[i_coord * 2 + 1] * nsamps;
         iarr_sh[3] = pmappings_cur[i_coord * 5 + 4]; // offset
-        //---
-       // const float* tail = &state_in[iarr_sh[0]];
-       // const float* head = &state_in[iarr_sh[1]];
-       // float* out = &state_out[iarr_sh[2]];
+        //---      
         if (isamp < iarr_sh[3])
         {
-            state_out[iarr_sh[2] + isamp] = state_in[iarr_sh[0] + isamp];
-           
+           state_out[iarr_sh[2] + isamp] = state_in[iarr_sh[0] + isamp];
+
         }
         else
         {
@@ -578,20 +642,14 @@ void kernel_execute_iter_v1(const float* state_in, float* state_out
 
     if (i_coord < coords_copy_cur_size)
     {
-        int i_sub = pcoords_copy_cur[i_coord * 2];
-        int i_dt = pcoords_copy_cur[i_coord * 2 + 1];
-        int i_sub_tail = pmappings_copy_cur[i_coord * 5];
-        int i_dt_tail = pmappings_copy_cur[i_coord * 5 + 1];
-        int state_sub_idx = pstate_sub_idx_cur[i_sub];
-        int state_sub_idx_tail = pstate_sub_idx_prev[i_sub_tail];
+       int i_sub = pcoords_copy_cur[i_coord * 2];
+       
+        int state_sub_idx = pstate_sub_idx_cur[i_sub];    
 
-        iarr_sh[4] = state_sub_idx_tail + i_dt_tail * nsamps;
-        iarr_sh[5] = state_sub_idx + i_dt * nsamps;
-        //--
-
-       // const float* tail = &state_in[iarr_sh[4]];
-       // float* out = &state_out[iarr_sh[5]];
-        state_out[iarr_sh[5] + isamp] =  state_in[iarr_sh[4] + isamp] ;
-        //out[isamp] = tail[isamp];
+        iarr_sh[4] = pstate_sub_idx_prev[pmappings_copy_cur[i_coord * 5]] + pmappings_copy_cur[i_coord * 5 + 1] * nsamps;
+        iarr_sh[5] = pstate_sub_idx_cur[pcoords_copy_cur[i_coord * 2]] + pcoords_copy_cur[i_coord * 2 + 1] * nsamps;
+        //--            
+        state_out[iarr_sh[5] + isamp] = state_in[iarr_sh[4] + isamp];
+      
     }
 }

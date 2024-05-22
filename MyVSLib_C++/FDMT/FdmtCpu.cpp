@@ -7,6 +7,7 @@
 #include <chrono>
 #include <omp.h>
 
+int NUmOperation = 0;
 CFdmtCpu::~CFdmtCpu()
 {	
 	if (m_pparrFreq_h != NULL)
@@ -221,7 +222,10 @@ void CFdmtCpu::process_image(fdmt_type_* piarrImgInp, fdmt_type_* piarrImgOut, c
 	
    // 3. call initialization func
 	const int ideltaT = calc_deltaT(m_Fmin, m_Fmin + (m_Fmax - m_Fmin) / m_nchan);
+
+	NUmOperation = 0;
 	fnc_initC(piarrImgInp, ideltaT, piarrOut_0, b_ones);
+	printf("NUmOperation = %i\n", NUmOperation);
 	// !3
 
 	// 4.pointers fixing
@@ -320,6 +324,7 @@ void  CFdmtCpu::fnc_initC(fdmt_type_* piarrImg, const int IDeltaT, fdmt_type_* p
 				for (int j = 0; j < m_cols; ++j)
 				{
 					piarrOut[i * (IDeltaT + 1) * m_cols + j] = piarrImg[i * m_cols + j];
+					++NUmOperation;
 				}
 					//memcpy(&piarrOut[i * (IDeltaT + 1) * m_cols], &piarrImg[i * m_cols]
 					//	, m_cols * sizeof(fdmt_type_));
@@ -356,12 +361,11 @@ void  CFdmtCpu::fnc_initC(fdmt_type_* piarrImg, const int IDeltaT, fdmt_type_* p
 				{
 					float t = (b_ones) ? 1.0 : (float)piarrImg[iF * m_cols + j];
 					result[j] = (fdmt_type_)((((float)arg0[j]) * ((float)i_dT) + t) / ((float)(i_dT + 1)));
-					
+					++NUmOperation;
 				}
 			}
-	
-
 }
+//------------------------------------------------------------------------------
 float fnc_delay_h(const float fmin, const float fmax)
 {
 	return (1.0 / (fmin * fmin) - 1.0 / (fmax * fmax));

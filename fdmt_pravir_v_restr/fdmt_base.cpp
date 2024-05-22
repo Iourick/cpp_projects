@@ -55,6 +55,7 @@ FDMT::FDMT(float f_min, float f_max, SizeType nchans, SizeType nsamps,
 // Getters
 float FDMT::get_df() const { return m_df; }
 float FDMT::get_correction() const { return m_correction; }
+int FDMT::get_m_nsamps() const { return static_cast<int>(m_nsamps); };
 
 SizeType FDMT::get_niters() const { return m_niters; }
 const FDMTPlan& FDMT::get_plan() const { return m_fdmt_plan; }

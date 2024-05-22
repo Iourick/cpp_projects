@@ -274,7 +274,7 @@ void CFdmtGpu::process_image(fdmt_type_* d_parrImage       // on-device input im
 	, const bool b_ones
 )
 {	
-	//auto start = std::chrono::high_resolution_clock::now();
+	auto start = std::chrono::high_resolution_clock::now();
 	const dim3 blockSize = dim3(1024, 1);
 	const dim3 gridSize = dim3((m_cols + blockSize.x - 1) / blockSize.x, m_nchan);
 	kernel_init_fdmt0 << < gridSize, blockSize >> > (d_parrImage, m_parrQuantMtrx_d[0], m_pcols_d, m_pparrRowsCumSum_d[0][1], m_arrOut0, b_ones);
@@ -285,9 +285,9 @@ void CFdmtGpu::process_image(fdmt_type_* d_parrImage       // on-device input im
 		fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus1));
 		return ;
 	}
-	//auto end = std::chrono::high_resolution_clock::now();
-	//auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	//std::cout << "Time taken by function kernel_init_fdmt0: " << duration.count() << " microseconds" << std::endl;
+	auto end = std::chrono::high_resolution_clock::now();
+	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	std::cout << "Time taken by function kernel_init_fdmt0: " << duration.count() << " microseconds" << std::endl;
 	
 	/*float* parr = (float*)malloc(m_nchan * m_cols*m_pparrRowsCumSum_h[0][1] * sizeof(float));
 	cudaMemcpy(parr, m_arrOut0, m_nchan * m_cols *  sizeof(float)
