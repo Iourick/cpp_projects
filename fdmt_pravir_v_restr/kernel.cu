@@ -389,7 +389,7 @@ int main(int argc, char** argv)
 	
 	std::cout << "timing begin" << std::endl;
 	// 3. calculations		
-	int num = 50;
+	int num = 150;
 	auto start = std::chrono::high_resolution_clock::now();
 
 	for (int i = 0; i < num; ++i)

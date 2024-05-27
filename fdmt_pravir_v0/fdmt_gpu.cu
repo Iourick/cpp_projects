@@ -256,11 +256,11 @@ void  FDMTGPU::execute(const float* waterfall, size_t waterfall_size, float* dmt
     auto start = std::chrono::high_resolution_clock::now();
     kernel_init_fdmt_v1 << < gridSize, blockSize >> > (waterfall, pstate_sub_idx_cur, pdt_grid
         , ppos_gridInnerVects_cur, state_in_ptr, nsamps);
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-    std::cout << "  Time taken by function initialise : " << duration.count() << " microseconds" << std::endl;
+   // std::cout << "  Time taken by function initialise : " << duration.count() << " microseconds" << std::endl;
 
   /*  int lenarr4 = plan.state_shape[0][3] * plan.state_shape[0][4];
     std::vector<float> data4(lenarr4, 0);
@@ -328,7 +328,7 @@ void  FDMTGPU::execute(const float* waterfall, size_t waterfall_size, float* dmt
           , coords_cur_size
           , coords_copy_cur_size
           );
-        cudaDeviceSynchronize();
+      //  cudaDeviceSynchronize();
 
         
 

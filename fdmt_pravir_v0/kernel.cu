@@ -27,7 +27,7 @@ enum TYPE_OF_PROCESSOR
 char strInpFolder[] = "..//FDMT_TESTS//2048";
 char strPathOutImageNpyFile_gpu[] = "out_image_GPU.npy";
 const bool BDIM_512_1024 = true;
-TYPE_OF_PROCESSOR PROCESSOR = CPU;
+TYPE_OF_PROCESSOR PROCESSOR = GPU;
 
 
 void printDeviceInfo()
