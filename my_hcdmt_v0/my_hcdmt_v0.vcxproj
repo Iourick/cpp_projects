@@ -67,6 +67,7 @@
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <FastMath>false</FastMath>
       <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
+      <AdditionalOptions>-allow-unsupported-compiler %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
     <PostBuildEvent>
       <Command>copy "D:\cpp_projects\Dependencies\fftw\bin" "$(OutDir)"

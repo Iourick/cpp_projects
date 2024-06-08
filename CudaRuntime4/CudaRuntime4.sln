@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.6.33815.320
+VisualStudioVersion = 17.10.34916.146
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fdmt_pravir_v0", "fdmt_pravir_v0.vcxproj", "{2B42DF9A-3332-423D-9EEB-33B13142CC54}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CudaRuntime4", "CudaRuntime4.vcxproj", "{BF70B54C-0C0C-41F1-B985-C7DD1EC22A28}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,15 +11,15 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{2B42DF9A-3332-423D-9EEB-33B13142CC54}.Debug|x64.ActiveCfg = Debug|x64
-		{2B42DF9A-3332-423D-9EEB-33B13142CC54}.Debug|x64.Build.0 = Debug|x64
-		{2B42DF9A-3332-423D-9EEB-33B13142CC54}.Release|x64.ActiveCfg = Debug|x64
-		{2B42DF9A-3332-423D-9EEB-33B13142CC54}.Release|x64.Build.0 = Debug|x64
+		{BF70B54C-0C0C-41F1-B985-C7DD1EC22A28}.Debug|x64.ActiveCfg = Debug|x64
+		{BF70B54C-0C0C-41F1-B985-C7DD1EC22A28}.Debug|x64.Build.0 = Debug|x64
+		{BF70B54C-0C0C-41F1-B985-C7DD1EC22A28}.Release|x64.ActiveCfg = Release|x64
+		{BF70B54C-0C0C-41F1-B985-C7DD1EC22A28}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {89FC9E64-213F-45BC-89DC-5BE8D85A2304}
+		SolutionGuid = {1CDD0595-3EDA-4018-8660-ACC9BB1BD8D8}
 	EndGlobalSection
 EndGlobal
