@@ -5,7 +5,7 @@
 #include <numeric>
 //#include <spdlog/spdlog.h>
 #include <stdexcept>  // For std::invalid_argument
-#include "fdmt_utils.hpp"
+#include "fdmtUtils.hpp"
 #include <fdmt_base.hpp>
 
 size_t FDMTPlan::calculate_memory_usage() const {

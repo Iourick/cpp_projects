@@ -2,7 +2,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/copy.h>
 #include <fdmt_gpu.cuh>
-
+#include <chrono>
 #include "npy.hpp" //! delete_
 
 extern cudaError_t cudaStatus0 = cudaSuccess;

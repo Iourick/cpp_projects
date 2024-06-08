@@ -4,7 +4,7 @@
 #endif
 
 #include <fdmt_cpu.hpp>
-#include <fdmt_utils.hpp>
+#include <fdmtUtils.hpp>
 #include <chrono>
 #include "npy.hpp" //! delete_
 

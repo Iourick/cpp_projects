@@ -2,7 +2,7 @@
 #include <cmath>
 #include <stdexcept>
 
-#include "fdmt_utils.hpp"
+#include "fdmtUtils.hpp"
 
 float fdmt::cff(float f1_start, float f1_end, float f2_start, float f2_end) {
     return (std::pow(f1_start, kDispCoeff) - std::pow(f1_end, kDispCoeff)) /
