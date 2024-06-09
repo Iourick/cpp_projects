@@ -1,0 +1,1 @@
+void fill_inpVect(std::vector<uint8_t >& vct_inpbuf, const int  nt, const int nf, const bool  invert_freq);

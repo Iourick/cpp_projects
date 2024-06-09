@@ -25,7 +25,7 @@ enum TYPE_OF_PROCESSOR
 	, GPU
 };
 
-char strInpFolder[] = "..//FDMT_TESTS//2048";
+char strInpFolder[] = "..//FDMT_TESTS//1024";
 char strPathOutImageNpyFile_gpu[] = "out_image_GPU.npy";
 const bool BDIM_512_1024 = true;
 TYPE_OF_PROCESSOR PROCESSOR = GPU;
@@ -338,7 +338,7 @@ int main(int argc, char** argv)
 	size_t dt_min = 0;
 
 	FDMT* pfdmt_cpu = new FDMTCPU(val_fmin, val_fmax, iImRows, iImCols, tsamp,
-		iMaxDT - 1, dt_step, dt_min);
+		(iMaxDT - 1), dt_step, dt_min);
 	const size_t IOutImageRows = pfdmt_cpu->get_dt_grid_final().size();
 	delete pfdmt_cpu;
 	char str[50] = { 0 };
