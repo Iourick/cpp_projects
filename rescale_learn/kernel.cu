@@ -14,8 +14,17 @@
 
 int main()
 {
+	/*float sum = 0.;
+	for (int i = 0; i < 256; ++i)
+	{
+		sum += (static_cast<float>(i - 128) * static_cast<float>(i - 128));
+	}
+	sum = sum / 256.0;
+	float std = sqrt(sum);*/
 	int nd = 16;
-	int nt = 16;
+	int nt = 4;// 16;
+	int nbeams = 1;
+	int nf = 2;// 4;
 	float seek_seconds = 0.0;
 	int num_rescale_blocks = 2;
 	float decay_timescale = 0.2; // Seconds?
@@ -43,8 +52,7 @@ int main()
 	// Load sigproc file
 	
 
-	int nbeams = 1;
-	int nf = 4;
+	
 	size_t in_chunk_size = nbeams * nf * nt;
 
 	// Create read buffer
@@ -110,6 +118,7 @@ int main()
 	// creation of input array
 	std::vector<uint8_t> vct_inpbuf_h(in_chunk_size);
 	fill_inpVect(vct_inpbuf_h, nt, nf, invert_freq);
+	
 	thrust::device_vector<uint8_t> vct_inpbuf_d(vct_inpbuf_h.size());
 	std::copy(vct_inpbuf_h.begin(), vct_inpbuf_h.end(), vct_inpbuf_d.begin());
 	//!
@@ -119,22 +128,59 @@ int main()
 	
 	
 	int num_flagged_beam_chans = 0;
-	int num_flagged_times = 0;
-	
-	
-		
+	int num_flagged_times = 0;		
 
 		// File is in TBF order
 		// Output needs to be BFT order
 		// Do transpose and cast to float on the way through using GPU
 		// copy raw data to state. Here we're a little dodgey
-
 		
 		uint8_t* read_buf_device = thrust::raw_pointer_cast(vct_inpbuf_d.data());		
 		
 		rescale_update_and_transpose_float_gpu(rescale, rescale_buf, read_buf_device, invert_freq, subtract_dm0);
-		
 
+		//
+
+		// Count how many times were flagged
+		assert(num_rescale_blocks >= 0);
+		array4d_copy_to_host(&rescale.nsamps); // must do this before updaing scaleoffset, which resets nsamps to zero
+
+		for (int i = 0; i < nf * nbeams; ++i)
+		{
+			int nsamps = (int)rescale.nsamps.d[i]; // nsamps is the number of unflagged samples from this block
+			int nflagged = rescale.sampnum - nsamps;
+			// rescale.sampnum is the total number of samples that has gone into the rescaler
+			assert(nflagged >= 0);
+			num_flagged_times += nflagged;
+		}
+
+
+		int blocknum = 0;
+		// do rescaling if required
+		if (num_rescale_blocks > 0 && blocknum % num_rescale_blocks == 0)
+		{
+			rescale_update_scaleoffset_gpu(rescale);
+
+			// Count how many  channels have been flagged for this whole block
+			// by looking at how many channels have scale==0
+			array4d_copy_to_host(&rescale.scale);
+			for (int i = 0; i < nf * nbeams; ++i)
+			{
+				if (rescale.scale.d[i] == 0)
+				{
+					// that channel will stay flagged for num_rescale_blocks
+					num_flagged_beam_chans += num_rescale_blocks;
+				}
+				// Count how many times have been flagged for this block
+				// TODO: DANGER DANGER! This doesn't count flagged times if num_rescale_blocks = 0
+				// This gave me a long headache at LAX when I set -s 1e30 stupidly.
+				int nsamps = (int)rescale.nsamps.d[i];
+				// nsamps is the number of unflagged samples in nt*num_rescale_blocks samples
+				int nflagged = nt * num_rescale_blocks - nsamps;
+				assert(nflagged >= 0);
+				num_flagged_times += nflagged;
+			}
+		}
     return 0;
 }
 
@@ -166,4 +212,22 @@ void fill_inpVect(std::vector<uint8_t >& vct_inpbuf, const int  nt, const int nf
 		}
 	}
 	free(piarr);
+}
+//----------------------------------------------------
+float calculateMean(float* arr, int n)
+{
+	float sum = 0.0;
+	for (int i = 0; i < n; ++i) {
+		sum += arr[i];
+	}
+	return sum / n;
+}
+
+float calculateVariance(float* arr, int n, float mean) 
+{
+	float sum = 0.0;
+	for (int i = 0; i < n; ++i) {
+		sum += (arr[i] - mean) * (arr[i] - mean);
+	}
+	return sum / n;
 }

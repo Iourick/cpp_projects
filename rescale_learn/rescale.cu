@@ -10,6 +10,7 @@
 #include <math.h>
 #include <stdio.h>
 //#include "array.h"
+#include "kernel.cuh"
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort = true) {
@@ -395,7 +396,7 @@ __global__ void rescale_calc_dm0_kernel (
 		}
 
 		int dm0idx = t + nt*ibeam;
-		rescale_dtype correction = rsqrtf((float) nsamp);
+		//rescale_dtype correction = rsqrtf((float) nsamp);
 		//dm0arr[dm0idx] = dm0sum * correction;
 		dm0arr[dm0idx] = dm0sum;
 		dm0count[dm0idx] = (float)nsamp;
@@ -421,7 +422,8 @@ __global__ void rescale_calc_dm0stats_kernel (
 	rescale_dtype dm0max = vinit;
 
 
-	for (int t = 0; t < nt; ++t) {
+	for (int t = 0; t < nt; ++t)
+	{
 		int dmidx = t + nt*ibeam;
 		rescale_dtype nsamp = dm0countarr[dmidx];
 		rescale_dtype v = dm0arr[dmidx] * rsqrtf(nsamp); // normalise to sqrt number of additions
@@ -477,8 +479,12 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 
 	gpuErrchk(cudaMemcpy(pdm0, rescale.dm0.d_device, nt * sizeof(float), cudaMemcpyDeviceToHost));
 	gpuErrchk(cudaMemcpy(pdm0count, rescale.dm0count.d_device, nt * sizeof(float), cudaMemcpyDeviceToHost));
-	free(pdm0);
-	free(pdm0count);
+
+	float mean = calculateMean(pdm0, nt);
+	float disp = calculateVariance(pdm0, nt,  mean)/static_cast<float>(nf);
+	mean = mean / sqrt(static_cast<float>(nf));
+
+	
 
 	// Take the mean all the dm0 times into one big number per beam - this is the how we flag
 	// short dropouts see ACES-209
@@ -491,6 +497,14 @@ void rescale_update_and_transpose_float_gpu(rescale_gpu_t& rescale, array4d_t& r
 			nt);
 
 	(cudaDeviceSynchronize());
+
+	float* pdm0stats = (float*)malloc(4 * sizeof(float));	
+	gpuErrchk(cudaMemcpy(pdm0stats, rescale.dm0stats.d_device, 4 * sizeof(float), cudaMemcpyDeviceToHost));	
+	free(pdm0stats);
+	free(pdm0);
+	free(pdm0count);
+	
+
 
 	if (subtract_dm0) {
 		rescale_update_and_transpose_float_kernel< true ><<<nbeams, nf>>>(

@@ -42,8 +42,8 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>D:\cpp_projects\Dependencies\fftw;D:\cpp_projects\MyVSLib_C++\CDMT;D:\cpp_projects\MyVSLib_C++\FDMT;C:\Program Files\HDF_Group\HDF5\1.14.3\include;D:\cpp_projects\MyVSLib_C++\CheckCudaErr;..\MyVSLib_C++;..\Dependencies\freeglut\include;$(IncludePath)</IncludePath>
-    <LibraryPath>D:\cpp_projects\Dependencies\fftw;C:\Program Files\HDF_Group\HDF5\1.14.3\lib;..\Dependencies\freeglut\lib\x64;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5\include;D:\cpp_projects\Dependencies\fftw;D:\cpp_projects\MyVSLib_C++\CDMT;D:\cpp_projects\MyVSLib_C++\FDMT;C:\Program Files\HDF_Group\HDF5\1.14.3\include;D:\cpp_projects\MyVSLib_C++\CheckCudaErr;..\MyVSLib_C++;..\Dependencies\freeglut\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5\lib\x64;D:\cpp_projects\Dependencies\fftw;C:\Program Files\HDF_Group\HDF5\1.14.3\lib;..\Dependencies\freeglut\lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>D:\cpp_projects\Dependencies\fftw;D:\cpp_projects\MyVSLib_C++\CDMT;D:\cpp_projects\MyVSLib_C++\FDMT;C:\Program Files\HDF_Group\HDF5\1.14.3\include;D:\cpp_projects\MyVSLib_C++\CheckCudaErr;..\MyVSLib_C++;..\Dependencies\freeglut\include;$(IncludePath)</IncludePath>
