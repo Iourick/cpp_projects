@@ -13,7 +13,9 @@
 #include  "fdmt_base.hpp"
 #include "fdmt_gpu.cuh"
 #include <span>
-#include <fdmt_v1_gpu.cuh>
+//#include <fdmt_v1_gpu.cuh>
+
+#include <fdmt_gpu.cuh>
 
 
 
@@ -389,7 +391,7 @@ int main(int argc, char** argv)
 	
 	std::cout << "timing begin" << std::endl;
 	// 3. calculations		
-	int num = 150;
+	int num = 500;
 	auto start = std::chrono::high_resolution_clock::now();
 
 	for (int i = 0; i < num; ++i)
