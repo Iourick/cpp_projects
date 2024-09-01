@@ -5,6 +5,7 @@ enum EN_telescope{ GBT,PARKES,LOFAR };
 class CTelescopeHeader
 {
 	public:
+		~CTelescopeHeader();
 		CTelescopeHeader();
 		CTelescopeHeader(const  CTelescopeHeader& R);
 		CTelescopeHeader&operator=(const CTelescopeHeader& R);

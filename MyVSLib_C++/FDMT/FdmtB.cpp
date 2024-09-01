@@ -7,10 +7,8 @@
 #include <vector>
 #include <chrono>
 
-CFdmtB::~CFdmtB()
-{
-	
-}
+CFdmtB::~CFdmtB() {}
+
 //---------------------------------------
 CFdmtB::CFdmtB()
 {

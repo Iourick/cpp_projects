@@ -6,12 +6,12 @@
 #include <complex> 
 #include "FdmtGpu.cuh"
 #include "Chunk_gpu.cuh"
-//#include "ChunkB.h"
+
 #define TILE_DIM 32
 using namespace std;
 
 class COutChunkHeader;
-class CFragment;
+
 class CFdmtU;
 class CTelescopeHeader;
  
@@ -39,12 +39,7 @@ public:
 		, const int nfft
 		, const int noverlap
 		, const float tsamp);
-	//---------------------------------------------------------------------------------------
-	
-	
-	
-
-	virtual void compute_chirp_channel();
+	//---------------------------------------------------------------------------------------	
 
 	virtual void  elementWiseMult(cufftComplex* d_arrOut, cufftComplex* d_arrInp0, int  idm);
 
@@ -52,24 +47,14 @@ public:
 
 __device__ cufftComplex cmpMult(cufftComplex& a, cufftComplex& b);
 
-
 __global__
 void kernel_el_wise_mult_onthe_fly(cufftComplex* parr_Out, cufftComplex* parr_Inp, double* pdm
 	, int nchan, int len_sft, int mbin, int nfft, int npol, double Fmin, double bw_sub, double bw_chan);
 
-__global__
-void kernel_el_wise_mult_onthe_fly_(cufftComplex* parr_Out, cufftComplex* parr_Inp, double* pdm
-	, int nchan, int len_sft, int mbin, int nfft, int npol, double Fmin, double bw_sub, double bw_chan);
 
 
 
 
-
-__global__ 	void  transpose_unpadd_intensity__(float* fbuf, float* arin, int nfft, int noverlap_per_channel
-	, int mbin_adjusted, const int nsub, const int nchan, int mbin);
-
-//__global__	void  transpose_unpadd_gpu(float* fbuf, float* arin, int nfft, int noverlap_per_channel
-//	, int mbin_adjusted, const int nsub, const int nchan, int mbin);
 
 
 

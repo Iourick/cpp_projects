@@ -2,19 +2,13 @@
 #include <string>
 #include "stdio.h"
 #include <iostream>
-
+#include "OutChunkHeader.h"
 #include <vector>
-#include "OutChunk.h"
 
-#include "CFdmtC.h"
+
+//#include "CFdmtC.h"
 #include <stdlib.h>
 #include <fftw3.h>
-
-//#include "Fragment.h"
-
-//#include "yr_cart.h"
-
-//#include "Chunk_cpu.h"
 #include <complex>
  
 
@@ -36,8 +30,7 @@ CSessionB::CSessionB()
     m_pulse_length = 1.0E-6;
     m_d_max = 0.;
     m_sigma_bound = 10.;
-    m_length_sum_wnd = 10;
-    //LenChunk = 0;
+    m_length_sum_wnd = 10;    
     m_nbin = 0;
     m_nfft = 0;
 }
@@ -107,15 +100,18 @@ int CSessionB::calcQuantBlocks(unsigned long long* pilength)
 }
 
 //---------------------------------------------------------------
+// OUTPUT:
+// * pvecImg - output fdmt image
+// *pmsamp - quantuty time-domain samples in chunk
 int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
-{
-    // calc quantity sessions
-    unsigned long long ilength = 0;
+{     
     // 1. blocks quantity calculation  
-    const int IBlock = calcQuantBlocks(&ilength);  
-   
+    // In GUPPI case there can be multiple blocks, in LOFAR case the only 1 
+    unsigned long long ilength = 0;
+    const int IBlock = calcQuantBlocks(&ilength);     
     //!1 
     
+    // 2. reading raw data header, overloaded for GUPPI and LOFAR cases
     FILE* rb_File = fopen(m_strInpPath, "rb");
     if (!readTelescopeHeader(
         rb_File
@@ -135,47 +131,60 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
         return false;
     }
     fclose(rb_File);
+    // !2 
+
+
     if (m_header.m_nbits / 8 != sizeof(inp_type_))
     {
         std::cout << "check up Constants.h, inp_type_  " << std::endl;
         return -1;
     }  
 
-    // Calculate the optimal channels per subband
+    // 3. Calculate the optimal channels per subband
     const int n_p = int(ceil(m_pulse_length / m_header.m_tresolution));
     const int len_sft = n_p;
+    // !3
     
-        // Calculate the optimal overlap
+    // 4. Calculate the optimal overlap
     int noverlap_optimal = get_optimal_overlap(len_sft)/ 2;
     printf("Optimal overlap: %i", noverlap_optimal);
    
-       const int  Noverlap = pow(2, round(log2(noverlap_optimal)));
-       if (m_nbin < 2 * Noverlap)
-       {
-           printf("nbin must be greater than %i", 2 * Noverlap);
-       }
+    const int  Noverlap = pow(2, round(log2(noverlap_optimal)));
+    if (m_nbin < 2 * Noverlap)
+    {
+        printf("nbin must be greater than %i", 2 * Noverlap);
+    }
+    // !4
 
-       const int LenChunk = (m_nbin - 2 * Noverlap) * m_nfft;
-    // 4. memory allocation in GPU
-   // total number of downloding bytes to each chunk:
-       const long long QUantChunkBytes = calc_ChunkBytes(LenChunk);
-    // total number of downloding bytes to each channel:
+    // 5. calculation lengt of processing time series
+    const int LenChunk = (m_nbin - 2 * Noverlap) * m_nfft;
+     // !5
+       
+    // 6. calculation constants for memory managment
+        // total number of downloding bytes to each chunk:
+    const long long QUantChunkBytes = calc_ChunkBytes(LenChunk);
+      // total number of downloding bytes to each channel:
     const long long QUantTotalChannelBytes = calc_TotalChannelBytes();
     const long long QUantChunkComplexNumbers = calc_ChunkComplexNumbers();
     const long long QUantDownloadingBytesForChunk = calc_ChunkBytes(LenChunk);
     const long long QUantOverlapBytes= calc_ChunkBytes(Noverlap);     
-  
+  // !6
    
+    // 7. Memory allocation for input buffer
+    // overloaded 4 times- {LOFAR, GUPPI}x{CPU,GPU}
     void* parrInput =  nullptr;
     void* pcmparrRawSignalCur = nullptr;
     if (!(allocateInputMemory( &parrInput,  QUantDownloadingBytesForChunk,  &pcmparrRawSignalCur ,  QUantChunkComplexNumbers)))
     {
         return 1;
     }
+    // !7
     
-    
+    // 8.  Compute the coherent DMs for the FDMT algorithm.
     int ncoherent   = get_coherent_dms();
+    //!8
     
+    // 9. Chunk creation. Overloaded for CPU and GPU cases
     CChunkB* pChunk= new  CChunkB();
     CChunkB** ppChunk = &pChunk;    
     createChunk(ppChunk
@@ -195,71 +204,77 @@ int CSessionB::launch(std::vector<std::vector<float>>* pvecImg, int *pmsamp)
         , m_nfft
         , Noverlap
        , m_header.m_tresolution );
-    
+    // !9   
    
+    // 10. Opening raw data reading session, overloaded
     FILE** prb_File = (FILE**)malloc( sizeof(FILE*));
     if (!prb_File)
     {       
         return 1;
     }    
     openFileReadingStream(prb_File);    
-   //std::vector<float>* pvecImg = new std::vector<float>;
-  //  std::vector<std::vector<float>>* pvecImg = new std::vector<std::vector<float>>;
+    // !10
+   
+    /*--------  11. Main loop, for each block in session -----------------------------------------------------------------------------------------------------------------------*/ 
     for (int nB = 0; nB < IBlock; ++nB)        
-    {          
+    { 
+        //11.1 creation current telescope header. GUPPi raw file contains header for each block, contrary to LOFAR
+       createCurrentTelescopeHeader(prb_File);  
+       // !11.1
        
-        createCurrentTelescopeHeader(prb_File);     
-       
+       // 11.2 calculation chunk's number in block. 
         const int NumChunks = (m_header.m_nblocksize - 2 *QUantOverlapBytes - 1) / (QUantChunkBytes - 2 *QUantOverlapBytes) + 1;
         std::cout << "    BLOCK=  " << nB <<  "  NUM CHUNKS = "<< NumChunks<<std::endl;
-        // !6           
+        // !11.2     
+
+        // !11.3 Loop for each chunk in block          
         for (int j = 0; j < NumChunks; ++j)
         { 
             std::cout << "                chunk =   " << j <<  std::endl;
+
+            // 11.4 arrangements with last chunk in block. can not me multiple.
             if (j == (NumChunks - 1))
             {
                 size_t shift = calc_ShiftingBytes(QUantChunkBytes);
                 shift_file_pos(prb_File, -shift);
             }
+            // !11.4
 
-
+            // 11.5 downloading chunk in input buffer
            int ibytes = download_chunk(prb_File, (char*)parrInput, QUantChunkBytes);
+           // !11.5
 
+           // 11.6 preparation file pointer's true positon for next downloading
             if (j != (NumChunks - 1))
             {
                 size_t shift = calc_ShiftingBytes(2 * QUantOverlapBytes);
                 shift_file_pos(prb_File, -shift);
-            }           
+            }    
+            // !11.6
+
+            // 11.7 unpack_chunk(..) is overloaded for 4 cases: {LOFAR, GUPPI} x  {CPU,GPU}
+            // type of raw data file, place of memory allocation
+            // pcmparrRawSignalCur - unpacked complex raw signal
             unpack_chunk(LenChunk, Noverlap,  (inp_type_*)parrInput,  pcmparrRawSignalCur);
+            // !11.7
            (*ppChunk)->set_blockid(nB);
            (*ppChunk)->set_chunkid(j);
-           (*ppChunk)->process(pcmparrRawSignalCur, m_pvctSuccessHeaders, pvecImg);
 
-           // TEMPORARY FOR DEBUGGING LOFAR ONLY! DELETE LATER!
-          /* if (0== j)
-           {
-              break;
-           }*/
-               
+           // 11.8 Chunk's processing. Overloaded for 2 cases - CPU and GPU
+           // m_pvctSuccessHeaders - is not being used
+           // pvecImg - ouput fdmt vector
+           // pcmparrRawSignalCur - input complex raw signal
+           (*ppChunk)->process(pcmparrRawSignalCur, m_pvctSuccessHeaders, pvecImg);
+           // !11.8          
         }
+       
         *pmsamp = (*ppChunk)-> get_msamp();        
 
-        //std::cout << "/*****************************************************/ " << std::endl;
-        //std::cout << "/*****************************************************/ " << std::endl;
-        //std::cout << "/*****************************************************/ " << std::endl;
-        //iTotal_time = duration.count();
-        //std::cout << "Total time:                   " << iTotal_time << " microseconds" << std::endl;
-        //std::cout << "FDMT time:                    " << iFdmt_time << " microseconds" << std::endl;
-        //std::cout << "Read and data transform time: " << iReadTransform_time << " microseconds" << std::endl;
-        //std::cout << "FFT time:                     " << iFFT_time << " microseconds" << std::endl;
-        //std::cout << "Mean && disp time:            " << iMeanDisp_time << " microseconds" << std::endl;
-        //std::cout << "Normalization time:           " << iNormalize_time << " microseconds" << std::endl;
-
-        //std::cout << "/*****************************************************/ " << std::endl;
-        //std::cout << "/*****************************************************/ " << std::endl;
-        //std::cout << "/*****************************************************/ " << std::endl;	
         rewindFilePos(prb_File,   QUantTotalChannelBytes);            
     }
+   /*--------------  !11   -------------------------------------------------------------------------------------------------------------*/
+
+
    closeFileReadingStream(prb_File);     
    freeInputMemory(parrInput, pcmparrRawSignalCur);    
     delete (*ppChunk);  
@@ -348,169 +363,6 @@ bool CSessionB::createCurrentTelescopeHeader(FILE** prb_File)
 {
     return false;
 }
-//---------------------------------------------------------
-bool CSessionB::analyzeChunk(const COutChunkHeader outChunkHeader, CFragment* pFRg)
-{ 
-    //// calc quantity sessions
-    //unsigned long long ilength = 0;
-
-    //// 1. blocks quantity calculation
-
-    //const int IBlock = calcQuantBlocks(&ilength);
-
-
-    ////!1
-
-
-
-
-    //// 3. cuFFT plans preparations
-    //   // 3.1 reading first header
-
-
-
-
-    //cufftHandle plan0 = NULL;
-    //cufftHandle plan1 = NULL;
-    //int lenChunk = 0;
-    //char* d_parrInput = NULL;
-    //cufftComplex* pcmparrRawSignalCur = NULL;
-    //CFdmtU fdmt;
-    //void* pAuxBuff_fdmt = NULL;
-    //fdmt_type_* d_arrfdmt_norm = NULL;
-    //cufftComplex* pcarrTemp = NULL; //2	
-    //cufftComplex* pcarrCD_Out = NULL;//3
-    //cufftComplex* pcarrBuff = NULL;//3
-    //char* pInpOutBuffFdmt = NULL;
-    //CChunk_cpu* pChunk = new CChunk_cpu();
-
-    //do_plan_and_memAlloc(&lenChunk
-    //    , &plan0, &plan1, &fdmt, &d_parrInput, &pcmparrRawSignalCur
-    //    , &pAuxBuff_fdmt, &d_arrfdmt_norm
-    //    , &pcarrTemp
-    //    , &pcarrCD_Out
-    //    , &pcarrBuff, &pInpOutBuffFdmt, &pChunk);
-
-    //cudaStatus = cudaGetLastError();
-    //if (cudaStatus != cudaSuccess) {
-    //    fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
-    //    // Handle the error appropriately
-    //}
-
-    //// 4. memory allocation in GPU
-    //// total number of downloding bytes to each chunk:
-    //const long long QUantChunkBytes = lenChunk * m_header.m_nchan / 8 * m_header.m_npol * m_header.m_nbits;
-    //// total number of downloding bytes to each channel:
-    //const long long QUantTotalChannelBytes = m_header.m_nblocksize * m_header.m_nbits / 8 / m_header.m_nchan;
-    //const long long QUantChunkComplexNumbers = lenChunk * m_header.m_nchan * m_header.m_npol / 2;
-    //FILE** prb_File = (FILE**)malloc(sizeof(FILE*));
-    //if (!prb_File) {
-    //    // Handle memory allocation failure
-    //    return 1;
-    //}
-
-    //openFileReadingStream(prb_File);
-
-    //
-    //    
-    //for (int nB = 0; nB < outChunkHeader.m_numBlock +1; ++nB)
-    //{     
-
-    //    cudaStatus = cudaGetLastError();
-    //    if (cudaStatus != cudaSuccess) {
-    //        fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
-    //        // Handle the error appropriately
-    //    }
-
-    //    createCurrentTelescopeHeader(prb_File);
-
-
-    //    cudaStatus = cudaGetLastError();
-    //    if (cudaStatus != cudaSuccess) {
-    //        fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
-    //        // Handle the error appropriately
-    //    }
-    //    // number of downloding bytes to each chunk:
-    //    const long long QUantChunkBytes = lenChunk * m_header.m_nchan / 8 * m_header.m_npol * m_header.m_nbits;
-    //    // total number of downloding bytes to each channel:
-    //    const long long QUantTotalChannelBytes = m_header.m_nblocksize / m_header.m_nchan;
-    //    // total number of downloading complex numbers of channel:
-    //    const long long QUantChannelComplexNumbers = lenChunk * m_header.m_npol / 2;
-
-    //    const int NumChunks = (m_header.m_nblocksize + QUantChunkBytes - 1) / QUantChunkBytes;
-
-    //    // !6
-
-    //    // 7. remains of not readed elements in block
-    //    //long long iremainedBytes = m_header.m_nblocksize;
-    //    float val_coherent_d;
-    //    // !7
-    //    float valSNR = -1;
-    //    int argmaxRow = -1;
-    //    int argmaxCol = -1;
-    //    float coherentDedisp = -1.;
-
-    //    for (int j = 0; j < NumChunks; ++j)
-    //    {
-    //    
-    //        cudaStatus = cudaGetLastError();
-    //        if (cudaStatus != cudaSuccess) {
-    //            fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
-    //            // Handle the error appropriately
-    //        }
-    //        download_and_unpack_chunk(prb_File, lenChunk, j, (inp_type_*)d_parrInput, pcmparrRawSignalCur);
-    //        long long position4 = ftell(*prb_File);
-
-    //        if (!((nB == outChunkHeader.m_numBlock) && (j == outChunkHeader.m_numChunk)))
-    //        {
-    //            continue;
-    //        }
-
-    //        cudaStatus = cudaGetLastError();
-    //        if (cudaStatus != cudaSuccess) {
-    //            fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus));
-    //            // Handle the error appropriately
-    //        }
-
-    //        /*std::vector<inp_type_ > data0(quantDownloadingBytes/4, 0);
-    //        cudaMemcpy(data0.data(), d_parrInput, quantDownloadingBytes / 4 * sizeof(inp_type_ ),
-    //            cudaMemcpyDeviceToHost);
-    //        cudaDeviceSynchronize();*/
-
-    //        /*std::vector <std::complex<float>> data4(lenChunk* m_header.m_nchan * m_header.m_npol/2, 0);
-    //        cudaMemcpy(data4.data(), pcmparrRawSignalCur, lenChunk * m_header.m_nchan * m_header.m_npol / 2 * sizeof(cufftComplex),
-    //            cudaMemcpyDeviceToHost);
-    //        cudaDeviceSynchronize();*/
-    //                pChunk->detailedChunkProcessing(
-    //                    outChunkHeader
-    //                    , plan0
-    //                    , plan1
-    //                    , pcmparrRawSignalCur
-    //                    , d_arrfdmt_norm
-    //                    , pAuxBuff_fdmt
-    //                    , pcarrTemp
-    //                    , pcarrCD_Out
-    //                    , pcarrBuff
-    //                    , pInpOutBuffFdmt
-    //                    , pFRg);
-
-    //    }       
-    //}
-    //closeFileReadingStream(prb_File);
-    //free(prb_File);
-    //cudaFree(pcmparrRawSignalCur);
-    //cudaFree(d_arrfdmt_norm);
-    //cudaFree(pAuxBuff_fdmt);
-    //cudaFree(pcarrTemp); //2	
-    //cudaFree(pcarrCD_Out);//3
-    //cudaFree(pcarrBuff);//3
-    //cudaFree(pInpOutBuffFdmt);
-    //cudaFree(d_parrInput);
-    //delete pChunk;
-    //cufftDestroy(plan0);
-    //cufftDestroy(plan1);
-    return 0;
- }
 
  //-----------------------------------------------------------------
  size_t  CSessionB::download_chunk(FILE** rb_file, char* d_parrInput, const long long QUantDownloadingBytes)
@@ -528,237 +380,7 @@ bool CSessionB::navigateToBlock(FILE* rb_File,const int IBlockNum)
 {  
     return true;
 }
-
-
-//
-////-----------------------------------------------------------------
-//bool CSessionB::do_plan_and_memAlloc( int* pLenChunk
-//    , cufftHandle* pplan0, cufftHandle* pplan1, CFdmtU* pfdmt, char** d_pparrInput, cufftComplex** ppcmparrRawSignalCur
-//    , void** ppAuxBuff_fdmt, fdmt_type_** d_parrfdmt_norm
-//    , cufftComplex** ppcarrTemp
-//    , cufftComplex** ppcarrCD_Out
-//    , cufftComplex** ppcarrBuff, char** ppInpOutBuffFdmt, CChunk_cpu** ppChunk)
-//
-//{
-//    // 2.allocation memory for parametrs
-//  //  in CPU
-//    int nbits = 0;
-//    float chanBW = 0;
-//    int npol = 0;
-//    bool bdirectIO = 0;
-//    float centfreq = 0;
-//    int nchan = 0;
-//    float obsBW = 0;
-//    long long nblocksize = 0;
-//    EN_telescope TELESCOP = GBT;
-//    int ireturn = 0;
-//    float tresolution = 0.;
-//    // !2
-//    FILE* rb_File = fopen(m_strInpPath, "rb");
-//    if (!readTelescopeHeader(
-//        rb_File
-//        , &nbits
-//        , &chanBW
-//        , &npol
-//        , &bdirectIO
-//        , &centfreq
-//        , &nchan
-//        , &obsBW
-//        , &nblocksize
-//        , &TELESCOP
-//        , &tresolution
-//    )
-//        )
-//    {
-//        return false;
-//    }
-//    fclose(rb_File);
-//    if (nbits / 8 != sizeof(inp_type_))
-//    {
-//        std::cout << "check up Constants.h, inp_type_  " << std::endl;
-//        return -1;
-//    }
-//
-//    m_header = CTelescopeHeader(
-//        nbits
-//        , chanBW
-//        , npol
-//        , bdirectIO
-//        , centfreq
-//        , nchan
-//        , obsBW
-//        , nblocksize
-//        , TELESCOP
-//        , tresolution
-//    );
-//   
-//
-//    plan_and_memAlloc( pLenChunk
-//        , pplan0, pplan1, pfdmt, d_pparrInput, ppcmparrRawSignalCur
-//        , ppAuxBuff_fdmt, d_parrfdmt_norm, ppcarrTemp, ppcarrCD_Out
-//        , ppcarrBuff, ppInpOutBuffFdmt, ppChunk);
-//}
-//
-////------------------------------------------------------------------------------
-//
-//void CSessionB::plan_and_memAlloc(
-//    int* pLenChunk
-//    , cufftHandle* pplan0, cufftHandle* pplan1, CFdmtU* pfdmt, char** d_pparrInput, cufftComplex** ppcmparrRawSignalCur
-//    , void** ppAuxBuff_fdmt, fdmt_type_** d_parrfdmt_norm
-//    , cufftComplex** ppcarrTemp
-//    , cufftComplex** ppcarrCD_Out
-//    , cufftComplex** ppcarrBuff, char** ppInpOutBuffFdmt, CChunk_cpu** ppChunk)
-//{
-//    cudaError_t cudaStatus;
-//    const float VAlFmin =  m_header.m_centfreq - ((float) m_header.m_nchan) *  m_header.m_chanBW / 2.0;
-//    const float VAlFmax =  m_header.m_centfreq + ((float) m_header.m_nchan) *  m_header.m_chanBW / 2.0;
-//    // 3.2 calculate standard len_sft and LenChunk    
-//    const int len_sft = calc_len_sft(fabs( m_header.m_chanBW), m_pulse_length);
-//    *pLenChunk = _calcLenChunk_( m_header, len_sft, m_pulse_length, m_d_max);
-//
-//
-//    // 3.3 cuFFT plans preparations
-//
-//    cufftCreate(pplan0);
-//    checkCudaErrors(cufftPlan1d(pplan0, *pLenChunk, CUFFT_C2C,  m_header.m_nchan *  m_header.m_npol / 2));
-//
-//
-//
-//    cufftCreate(pplan1);
-//    checkCudaErrors(cufftPlan1d(pplan1, len_sft, CUFFT_C2C, (*pLenChunk) *  m_header.m_nchan *  m_header.m_npol / 2 / len_sft));
-//
-//
-//
-//    // !3
-//
-//    // 4. memory allocation in GPU
-//    // total number of downloding bytes to each file:
-//    const long long QUantDownloadingBytesForChunk = (*pLenChunk) *  m_header.m_nchan / 8 *  m_header.m_nbits *  m_header.m_npol;
-//
-//    const long long QUantBlockComplexNumbers = (*pLenChunk) *  m_header.m_nchan *  m_header.m_npol / 2;
-//
-//
-//
-//    checkCudaErrors(cudaMallocManaged((void**)d_pparrInput, QUantDownloadingBytesForChunk * sizeof(char)));
-//
-//
-//    checkCudaErrors(cudaMalloc((void**)ppcmparrRawSignalCur, QUantBlockComplexNumbers * sizeof(cufftComplex)));
-//    // 2!
-//
-//
-//
-//    // 4.memory allocation for auxillary buffer for fdmt   
-//       // there is  quantity of real channels
-//    const int NChan_fdmt_act = len_sft *  m_header.m_nchan;
-//    (*pfdmt) = CFdmtU(
-//        VAlFmin
-//        , VAlFmax
-//        , NChan_fdmt_act
-//        , (*pLenChunk) / len_sft
-//        , m_pulse_length
-//        , m_d_max
-//        , len_sft);
-//
-//
-//
-//    size_t szBuff_fdmt = pfdmt->calcSizeAuxBuff_fdmt_();
-//
-//    checkCudaErrors(cudaMalloc(ppAuxBuff_fdmt, szBuff_fdmt));
-//    // 4!
-//
-//
-//    // 3. memory allocation for fdmt_ones on GPU  ????
-//    size_t szBuff_fdmt_output = pfdmt->calc_size_output();
-//
-//    checkCudaErrors(cudaMalloc((void**)d_parrfdmt_norm, szBuff_fdmt_output));
-//    //// 6. calculation fdmt ones
-//    pfdmt->process_image(nullptr      // on-device input image
-//        , *ppAuxBuff_fdmt
-//        , *d_parrfdmt_norm	// OUTPUT image,
-//        , true);
-//
-//    // 3!
-//
-//
-//
-//
-//    // 5. memory allocation for the 3 auxillary cufftComplex  arrays on GPU	
-//    //cufftComplex* pffted_rowsignal = NULL; //1	
-//
-//
-//
-//    checkCudaErrors(cudaMalloc((void**)ppcarrTemp, QUantBlockComplexNumbers * sizeof(cufftComplex)));
-//
-//    checkCudaErrors(cudaMalloc((void**)ppcarrCD_Out, QUantBlockComplexNumbers * sizeof(cufftComplex)));
-//
-//    checkCudaErrors(cudaMalloc((void**)ppcarrBuff, QUantBlockComplexNumbers * sizeof(cufftComplex)));
-//    // !5
-//
-//    // 5. memory allocation for the 2 auxillary arrays on GPU for input and output of FDMT	
-//    size_t szInpOut_fdmt = pfdmt->calc_size_output() + pfdmt->calc_size_input();
-//
-//    checkCudaErrors(cudaMalloc((void**)ppInpOutBuffFdmt, szInpOut_fdmt));
-//
-//    // 5!
-//
-//    // !4	
-//    **ppChunk = CChunk_cpu(
-//        VAlFmin
-//        , VAlFmax
-//        ,  m_header.m_npol
-//        ,  m_header.m_nchan
-//        , (*pLenChunk)
-//        , len_sft
-//        , 0
-//        , 0
-//        ,  m_header.m_nbits
-//        , m_d_max
-//        , m_sigma_bound
-//        , m_length_sum_wnd
-//        , *pfdmt
-//        , m_pulse_length
-//    );
-//
-//}
-////------------------------------------------------------------
-//
-//long long CSessionB::_calcLenChunk_(CTelescopeHeader header, const int nsft
-//    , const float pulse_length, const float d_max)
-//{
-//    const int nchan_actual = nsft * header.m_nchan;
-//
-//    long long len = 0;
-//    for (len = 1 << 9; len < 1 << 30; len <<= 1)
-//    {
-//        CFdmtU fdmt(
-//            header.m_centfreq - header.m_chanBW * header.m_nchan / 2.
-//            , header.m_centfreq + header.m_chanBW * header.m_nchan / 2.
-//            , nchan_actual
-//            , len
-//            , pulse_length
-//            , d_max
-//            , nsft
-//        );
-//        long long size0 = fdmt.calcSizeAuxBuff_fdmt_();
-//        long long size_fdmt_inp = fdmt.calc_size_input();
-//        long long size_fdmt_out = fdmt.calc_size_output();
-//        long long size_fdmt_norm = size_fdmt_out;
-//        long long irest = header.m_nchan * header.m_npol * header.m_nbits / 8 // input buff
-//            + header.m_nchan * header.m_npol / 2 * sizeof(cufftComplex)
-//            + 3 * header.m_nchan * header.m_npol * sizeof(cufftComplex) / 2
-//            + 2 * header.m_nchan * sizeof(float);
-//        irest *= len;
-//
-//        long long rez = size0 + size_fdmt_inp + size_fdmt_out + size_fdmt_norm + irest;
-//        if (rez > 0.98 * TOtal_GPU_Bytes)
-//        {
-//            return len / 2;
-//        }
-//
-//    }
-//    return -1;
-//}
-
+//------------------------------------------------------------------------------------------
 int CSessionB::get_optimal_overlap(const int nsft)
 {
     float  bw_chan = fabs(m_header.m_obsBW) / (m_header.m_nchan * nsft);       
@@ -769,9 +391,9 @@ int CSessionB::get_optimal_overlap(const int nsft)
     return int(delay_samples);
 }
 //--------------------------------------------------------------
+// Compute the coherent DMs for the FDMT algorithm.
 int  CSessionB::get_coherent_dms()
-{
-    // Compute the coherent DMs for the FDMT algorithm.
+{    
     float f_min = m_header.m_centfreq - fabs(m_header.m_obsBW) / 2.0;
     float f_max = m_header.m_centfreq + fabs(m_header.m_obsBW) / 2.0;
     float    t_d = 4.148808e3 * m_d_max * (1.0 / (f_min * f_min) - 1.0 / (f_max * f_max));

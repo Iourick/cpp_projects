@@ -47,26 +47,26 @@ public:
 	
 
 
-	void process_image(fdmt_type_* d_parrImage       // on-device input image	
-		, fdmt_type_* u_parrImOut	// OUTPUT image
+	void process_image(fdmt_type_* __restrict d_parrImage       // on-device input image	
+		, fdmt_type_* __restrict u_parrImOut	// OUTPUT image
 		, const bool b_ones
-		);		
+	);
 
 	virtual size_t calcSizeAuxBuff_fdmt_();	
 
 };
 
 __global__
-void kernel_init_fdmt0(fdmt_type_* d_parrImg, const int &IImgrows, const int *IImgcols
-	, const int &IDeltaT, fdmt_type_* d_parrOut, const bool b_ones);
+void kernel_init_fdmt0(fdmt_type_* __restrict d_parrImg, const int& IImgrows, const int* IImgcols
+	, const int& IDeltaTP1, fdmt_type_* __restrict d_parrOut, const bool b_ones);
 
 __device__
 double fnc_delay(const float fmin, const float fmax);
 
 __global__
-void kernel_fdmtIter_v1(fdmt_type_* d_parrInp, const int *cols, int& quantSubMtrx, int* iarrCumSum, float* arrFreq
-	, int& quantSubMtrxCur, int* iarrCumSumCur, float* arrFreqCur
-	, fdmt_type_* d_parrOut);
+void kernel_fdmtIter_v1(fdmt_type_* __restrict d_parrInp, const int* cols, int& quantSubMtrx, int* iarrCumSum, float* __restrict arrFreq
+	, int& quantSubMtrxCur, int* __restrict iarrCumSumCur, float* __restrict arrFreqCur
+	, fdmt_type_* __restrict d_parrOut);
 
 
 //-----------------------------------------------------------------------

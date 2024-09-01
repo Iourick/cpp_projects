@@ -6,7 +6,7 @@
 #include "stdio.h"
 #include <iostream>
 
-
+CTelescopeHeader::~CTelescopeHeader() = default;
 
 CTelescopeHeader::CTelescopeHeader() 
 {
@@ -24,7 +24,7 @@ CTelescopeHeader::CTelescopeHeader()
     m_bSraightchannelOrder = true;
 }
 
-// конструктор копирования
+
 CTelescopeHeader::CTelescopeHeader(const  CTelescopeHeader& R) 
 {
 	m_nbits = R.m_nbits;

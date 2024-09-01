@@ -48,3 +48,9 @@ public:
 __global__
 void unpackInput_lofar(cufftComplex* pcmparrRawSignalCur, inp_type_* d_parrInput, const int NPolPh, const int LenChunk, const int nbin, const int  Noverlap);
 
+//inline int calcThreadsForMean_and_Disp(unsigned const int nCols)
+//{
+//    int k = std::log(nCols) / std::log(2.0);
+//    k = ((1 << k) > nCols) ? k + 1 : k;
+//    return 1 << std::min(k, 10);
+//};

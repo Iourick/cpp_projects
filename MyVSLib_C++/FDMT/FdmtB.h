@@ -6,7 +6,7 @@
 class CFdmtB
 {
 public:
-	~CFdmtB();
+	virtual~CFdmtB();
 	CFdmtB();
 	CFdmtB(const  CFdmtB& R);
 	CFdmtB& operator=(const CFdmtB& R);

@@ -13,12 +13,13 @@
 #include <cmath>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include "yr_cart.h"
+
 
 cudaError_t cudaStatus1;
 
 CFdmtGpu::~CFdmtGpu() 
 {
+	printf("dextr \n");
 	if (m_pparrFreq_d !=NULL)
 	{
 		for (int i = 0; i < (m_iNumIter + 1); ++i)
@@ -269,8 +270,8 @@ CFdmtGpu::CFdmtGpu(
 }
 
 //----------------------------------------------------
-void CFdmtGpu::process_image(fdmt_type_* d_parrImage       // on-device input image	
-	, fdmt_type_* u_parrImOut	// OUTPUT image
+void CFdmtGpu::process_image(fdmt_type_* __restrict d_parrImage       // on-device input image	
+	, fdmt_type_* __restrict u_parrImOut	// OUTPUT image
 	, const bool b_ones
 )
 {	
@@ -278,7 +279,7 @@ void CFdmtGpu::process_image(fdmt_type_* d_parrImage       // on-device input im
 	const dim3 blockSize = dim3(1024, 1);
 	const dim3 gridSize = dim3((m_cols + blockSize.x - 1) / blockSize.x, m_nchan);
 	kernel_init_fdmt0 << < gridSize, blockSize >> > (d_parrImage, m_parrQuantMtrx_d[0], m_pcols_d, m_pparrRowsCumSum_d[0][1], m_arrOut0, b_ones);
-	cudaDeviceSynchronize();
+	//cudaDeviceSynchronize();
 
 	cudaStatus1 = cudaGetLastError();
 	if (cudaStatus1 != cudaSuccess) {
@@ -287,7 +288,7 @@ void CFdmtGpu::process_image(fdmt_type_* d_parrImage       // on-device input im
 	}
 	auto end = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	std::cout << "Time taken by function kernel_init_fdmt0: " << duration.count() << " microseconds" << std::endl;
+	//std::cout << "Time taken by function kernel_init_fdmt0: " << duration.count() << " microseconds" << std::endl;
 	
 	/*float* parr = (float*)malloc(m_nchan * m_cols*m_pparrRowsCumSum_h[0][1] * sizeof(float));
 	cudaMemcpy(parr, m_arrOut0, m_nchan * m_cols *  sizeof(float)
@@ -319,7 +320,7 @@ void CFdmtGpu::process_image(fdmt_type_* d_parrImage       // on-device input im
 		const dim3 gridSize = dim3((m_cols + blockSize.x - 1) / blockSize.x, m_parrMaxQuantRows_h[iit], m_parrQuantMtrx_h[iit]);
 		kernel_fdmtIter_v1 << < gridSize, blockSize >> > (d_p0, m_pcols_d, m_parrQuantMtrx_d[iit-1], m_pparrRowsCumSum_d[iit - 1], m_pparrFreq_d[iit - 1]
 			, m_parrQuantMtrx_d[iit ], m_pparrRowsCumSum_d[iit], m_pparrFreq_d[iit], d_p1);		
-		cudaDeviceSynchronize();
+		//cudaDeviceSynchronize();
 		
 		cudaStatus1 = cudaGetLastError();
 		if (cudaStatus1 != cudaSuccess) {
@@ -348,9 +349,9 @@ void CFdmtGpu::process_image(fdmt_type_* d_parrImage       // on-device input im
 
 //----------------------------------------
 __global__
-void kernel_fdmtIter_v1(fdmt_type_* d_parrInp, const int *cols, int& quantSubMtrx, int* iarrCumSum, float* arrFreq
-	, int& quantSubMtrxCur, int* iarrCumSumCur, float* arrFreqCur
-	, fdmt_type_* d_parrOut)
+void kernel_fdmtIter_v1(fdmt_type_* __restrict d_parrInp, const int *cols, int& quantSubMtrx, int* iarrCumSum, float* __restrict arrFreq
+	, int& quantSubMtrxCur, int* __restrict iarrCumSumCur, float* __restrict arrFreqCur
+	, fdmt_type_* __restrict d_parrOut)
 {
 	__shared__ int shared_iarr[6];
 	
@@ -414,8 +415,8 @@ size_t CFdmtGpu::calcSizeAuxBuff_fdmt_()
 
 //--------------------------------------------------------------------------------------
 __global__
-void kernel_init_fdmt0(fdmt_type_* d_parrImg, const int &IImgrows, const int *IImgcols
-	, const int &IDeltaTP1, fdmt_type_* d_parrOut, const bool b_ones)
+void kernel_init_fdmt0(fdmt_type_* __restrict d_parrImg, const int &IImgrows, const int *IImgcols
+	, const int &IDeltaTP1, fdmt_type_* __restrict d_parrOut, const bool b_ones)
 {
 	int i_F = blockIdx.y;
 	int numOutElemInRow = blockIdx.x * blockDim.x + threadIdx.x;
@@ -472,7 +473,7 @@ double fnc_delay(const float fmin, const float fmax)
 //---------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------
-//-----------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------
 
 __global__
 void kernel3D_Main_012_v1(fdmt_type_* d_parrInp, const int IDim0, const int IDim1

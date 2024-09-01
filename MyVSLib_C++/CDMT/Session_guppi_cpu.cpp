@@ -3,15 +3,14 @@
 #include "stdio.h"
 #include <iostream>
 
-#include "OutChunk.h"
+//#include "OutChunk.h"
 
 
 #include <stdlib.h>
-#include "Fragment.h"
+
 #include <fftw3.h>
 #include <hdf5.h> 
 #include <complex>
-#include "yr_cart.h"
 #include "Chunk_cpu.h"
 #include <complex>
 #include "Session_guppi.h"

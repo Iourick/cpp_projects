@@ -13,7 +13,7 @@
 extern const unsigned long long TOtal_GPU_Bytes;
 class CTelescopeHeader;
 class COutChunkHeader;
-class CFragment;
+//class CFragment;
 class CFdmtU;
 class CChunk_cpu;
  
@@ -31,7 +31,7 @@ enum TYPE_OF_PROCESSOR
 class CSessionB
 {
 public:
-	~CSessionB();
+	virtual~CSessionB();
 	CSessionB();
 	CSessionB(const  CSessionB& R);
 	CSessionB& operator=(const CSessionB& R);
@@ -61,9 +61,7 @@ public:
 
 	virtual bool closeFileReadingStream(FILE**& prb_File);
 
-	int launch(std::vector<std::vector<float>>* pvecImg, int* pmsamp)	;
-
-	bool analyzeChunk(const COutChunkHeader outChunkHeader, CFragment* pFRg);
+	int launch(std::vector<std::vector<float>>* pvecImg, int* pmsamp)	;	
 
 	virtual bool navigateToBlock(FILE* rbFile, const int IBlockNum);
 

@@ -51,11 +51,7 @@ int CSession_guppi::calcQuantBlocks(unsigned long long* pilength)
     float tresolution = 0.;
     *pilength = 0;
     for (int i = 0; i < 1 << 26; ++i)
-    {
-        if (16 == i)
-        {
-            int hh = 0;
-        }
+    {       
         std::int64_t pos0 = ftell(rb_File);
         if (!readTelescopeHeader(
             rb_File
@@ -224,7 +220,7 @@ bool CSession_guppi::readTelescopeHeader(FILE* r_file
     *obsBW = atof(pio + 9);
     //10 !
 
-    // 11.downloading BLOCSIZE
+    // 11.downloading BLOCKSIZE
     pio = strstr(strHeader, "BLOCSIZE");
     if (NULL == pio)
     {

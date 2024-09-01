@@ -8,7 +8,7 @@ class CFdmtCpu;
 #include <fftw3.h>
 #include <complex> 
 #define STR_WIS_LEN 10000
-//class CFragment;
+
 //class CTelescopeHeader;
 
 class CChunk_cpu:public CChunkB

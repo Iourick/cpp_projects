@@ -8,7 +8,7 @@ class COutChunkHeader;
 class CChunkB
 {
 public:
-	~CChunkB();
+	virtual~CChunkB();
 	CChunkB();
 	CChunkB(const  CChunkB& R);
 	CChunkB& operator=(const CChunkB& R);
@@ -44,10 +44,6 @@ public:
 	//within the file (=OBSNCHAN).
 	unsigned int m_nchan;
 
-	// length of time series of each channel
-	
-	//unsigned m_lenChunk;
-
 	unsigned int m_len_sft;
 
 	float m_tsamp;
@@ -65,9 +61,13 @@ public:
 	float m_sigma_bound;
 
 	int m_length_sum_wnd;
+
 	int m_nbin;
+
 	int m_nfft;
+
 	int m_noverlap;
+
 	std::vector<double> m_coh_dm_Vector;
 	//-------------------------------------------------------------------------
 	virtual bool process(void* pcmparrRawSignalCur
@@ -77,13 +77,15 @@ public:
 	inline int get_noverlap_per_channel()
 	{
 		return m_noverlap / m_len_sft;
-	};
+	}
 
+	// quantity of bins in time domain after unpadding
 	inline int get_mbin_adjusted()
 	{
 		return get_mbin() - 2 * get_noverlap_per_channel();
 	}
 
+// quantity of bin in time domain after short FFT 
 	inline int get_mbin()
 	{
 		return  m_nbin / m_len_sft;

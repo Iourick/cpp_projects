@@ -1,8 +1,8 @@
 #include "Session_guppi_gpu.cuh"
 #include <stdlib.h>
-#include "Fragment.h"
 
-#include "yr_cart.h"
+
+
 #include "helper_functions.h"
 #include "helper_cuda.h"
 #include "cuda_runtime.h"
@@ -50,7 +50,6 @@ CSession_guppi_gpu::CSession_guppi_gpu(const char* strGuppiPath, const char* str
 //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-
 bool   CSession_guppi_gpu::unpack_chunk(const long long lenChunk, const int Noverlap, inp_type_* d_parrInput, void* pcmparrRawSignalCur)
 {
     dim3 threads(256, 1, 1);
@@ -67,8 +66,6 @@ bool CSession_guppi_gpu::allocateInputMemory(void** d_pparrInput, const int QUan
     checkCudaErrors(cudaMalloc((void**)pcmparrRawSignalCur, QUantChunkComplexNumbers * sizeof(cufftComplex)));
     return true;
 }
-
-
 //------------------------------------------------------------------------------------
 void CSession_guppi_gpu::freeInputMemory(void* parrInput, void* pcmparrRawSignalCur)
 {

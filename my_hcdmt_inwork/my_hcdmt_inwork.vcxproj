@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{2B42DF9A-3332-423D-9EEB-33B13142CC54}</ProjectGuid>
+    <RootNamespace>my_hcdmt_inwork</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <CudaToolkitCustomDir>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5</CudaToolkitCustomDir>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.5.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>D:\cpp_projects\MyVSLib_C++;D:\cpp_projects\MyVSLib_C++\Clusterization;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5\include;D:\cpp_projects\Dependencies\fftw;D:\cpp_projects\MyVSLib_C++\CDMT;D:\cpp_projects\MyVSLib_C++\FDMT;C:\Program Files\HDF_Group\HDF5\1.14.3\include;D:\cpp_projects\MyVSLib_C++\CheckCudaErr;..\MyVSLib_C++;..\Dependencies\freeglut\include;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.5\lib\x64;D:\cpp_projects\Dependencies\fftw;C:\Program Files\HDF_Group\HDF5\1.14.3\lib;..\Dependencies\freeglut\lib\x64;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>D:\cpp_projects\Dependencies\fftw;D:\cpp_projects\MyVSLib_C++\Clusterization;D:\cpp_projects\MyVSLib_C++\CDMT;D:\cpp_projects\MyVSLib_C++\FDMT;C:\Program Files\HDF_Group\HDF5\1.14.3\include;D:\cpp_projects\MyVSLib_C++\CheckCudaErr;..\MyVSLib_C++;..\Dependencies\freeglut\include;$(IncludePath)</IncludePath>
+    <LibraryPath>D:\cpp_projects\Dependencies\fftw;C:\Program Files\HDF_Group\HDF5\1.14.3\lib;..\Dependencies\freeglut\lib\x64;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>D:\cpp_projects\MyVSLib_C++\Clusterization;$(SolutionDir);..\MyVSLib_C++;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <UseStandardPreprocessor>true</UseStandardPreprocessor>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;libaec.lib;libszaec.lib;libzlib.lib;shlwapi.lib;freeglut.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;DevIL.lib;ILU.lib;ILUT.lib;cufft.lib;libhdf5.lib;libhdf5_cpp.lib;libhdf5_hl.lib;libhdf5_hl_cpp.lib;libhdf5_tools.lib;libfftw3f-3.lib;libfftw3-3.lib;libfftw3l-3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <FastMath>false</FastMath>
+      <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
+      <AdditionalOptions>-allow-unsupported-compiler %(AdditionalOptions)</AdditionalOptions>
+    </CudaCompile>
+    <PostBuildEvent>
+      <Command>copy "D:\cpp_projects\Dependencies\fftw\bin" "$(OutDir)"
+copy "D:\cpp_projects\Dependencies\freeglut\bin\$(Platform)" "$(OutDir)"</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(SolutionDir);..\MyVSLib_C++;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <UseStandardPreprocessor>true</UseStandardPreprocessor>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>cudart_static.lib;kernel32.lib;user32.lib;libaec.lib;libszaec.lib;libzlib.lib;shlwapi.lib;freeglut.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;DevIL.lib;ILU.lib;ILUT.lib;cufft.lib;libhdf5.lib;libhdf5_cpp.lib;libhdf5_hl.lib;libhdf5_hl_cpp.lib;libhdf5_tools.lib;libfftw3f-3.lib;libfftw3-3.lib;libfftw3l-3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <CudaCompile>
+      <TargetMachinePlatform>64</TargetMachinePlatform>
+      <FastMath>false</FastMath>
+      <GenerateRelocatableDeviceCode>false</GenerateRelocatableDeviceCode>
+    </CudaCompile>
+    <PostBuildEvent>
+      <Command>copy "D:\cpp_projects\Dependencies\fftw\bin" "$(OutDir)"
+copy "D:\cpp_projects\Dependencies\freeglut\bin\$(Platform)" "$(OutDir)"</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CudaCompile Include="..\MyVSLib_C++\CDMT\Chunk_gpu.cu" />
+    <CudaCompile Include="..\MyVSLib_C++\CDMT\Chunk_fly_gpu.cu" />
+    <CudaCompile Include="..\MyVSLib_C++\CDMT\Session_guppi_gpu.cu" />
+    <CudaCompile Include="..\MyVSLib_C++\CDMT\Statistical_preprocessing.cu" />
+    <CudaCompile Include="..\MyVSLib_C++\Clusterization\Candidate.cu" />
+    <CudaCompile Include="..\MyVSLib_C++\Clusterization\Clusterization.cu" />
+    <CudaCompile Include="..\MyVSLib_C++\Clusterization\Segmented_sort.cu" />
+    <CudaCompile Include="..\MyVSLib_C++\Clusterization\select_delegates.cu" />
+    <CudaCompile Include="..\MyVSLib_C++\FDMT\FdmtGpu.cu" />
+    <CudaCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Dependencies\fftw\fftw3.h" />
+    <ClInclude Include="..\MyVSLib_C++\CDMT\ChunkB.h" />
+    <ClInclude Include="..\MyVSLib_C++\CDMT\Chunk_cpu.h" />
+    <CudaCompile Include="..\MyVSLib_C++\CDMT\Chunk_gpu.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\CDMT\Chunk_fly_gpu.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\CDMT\SessionB.h" />
+    <ClInclude Include="..\MyVSLib_C++\CDMT\Session_guppi.h" />
+    <ClInclude Include="..\MyVSLib_C++\CDMT\Session_guppi_cpu.h" />
+    <ClInclude Include="..\MyVSLib_C++\CDMT\Session_guppi_gpu.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\CDMT\Session_lofar.h" />
+    <ClInclude Include="..\MyVSLib_C++\CDMT\Session_lofar_cpu.h" />
+    <CudaCompile Include="..\MyVSLib_C++\CDMT\Session_lofar_gpu.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\CDMT\Statistical_preprocessing.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\CheckCudaErr\helper_cuda.h" />
+    <ClInclude Include="..\MyVSLib_C++\CheckCudaErr\helper_functions.h" />
+    <ClInclude Include="..\MyVSLib_C++\Clusterization\Candidate.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\Clusterization\Clusterization.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\Clusterization\Segmented_sort.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\Clusterization\select_delegates.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\Constants.h" />
+    <ClInclude Include="..\MyVSLib_C++\DrawImg.h" />
+    <ClInclude Include="..\MyVSLib_C++\FDMT\FdmtB.h" />
+    <ClInclude Include="..\MyVSLib_C++\FDMT\FdmtCpu.h" />
+    <ClInclude Include="..\MyVSLib_C++\FDMT\FdmtGpu.cuh" />
+    <ClInclude Include="..\MyVSLib_C++\TelescopeHeader.h" />
+    <ClInclude Include="..\MyVSLib_C++\OutChunkHeader.h" />
+    <ClInclude Include="..\MyVSLib_C++\npy.hpp" />
+    <ClInclude Include="Dependencies\freeglut\include\GL\freeglut.h" />
+    <ClInclude Include="Dependencies\freeglut\include\GL\glut.h" />
+    <ClInclude Include="Dependencies\freeglut\include\IL\devil_internal_exports.h" />
+    <ClInclude Include="main.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\MyVSLib_C++\CDMT\ChunkB.cpp" />
+    <ClCompile Include="..\MyVSLib_C++\CDMT\Chunk_cpu.cpp" />
+    <ClCompile Include="..\MyVSLib_C++\CDMT\SessionB.cpp" />
+    <ClCompile Include="..\MyVSLib_C++\CDMT\Session_guppi.cpp" />
+    <ClCompile Include="..\MyVSLib_C++\CDMT\Session_guppi_cpu.cpp" />
+    <ClCompile Include="..\MyVSLib_C++\CDMT\Session_lofar.cpp" />
+    <ClCompile Include="..\MyVSLib_C++\CDMT\Session_lofar_cpu.cpp" />
+    <ClCompile Include="..\MyVSLib_C++\FDMT\FdmtB.cpp" />
+    <ClCompile Include="..\MyVSLib_C++\FDMT\FdmtCpu.cpp" />
+    <CudaCompile Include="..\MyVSLib_C++\CDMT\Session_lofar_gpu.cu">
+      <FileType>Document</FileType>
+    </CudaCompile>
+    <ClCompile Include="..\MyVSLib_C++\DrawImg.cpp" />
+    <ClCompile Include="..\MyVSLib_C++\TelescopeHeader.cpp" />
+    <ClCompile Include="..\MyVSLib_C++\OutChunkHeader.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.5.targets" />
+  </ImportGroup>
+</Project>

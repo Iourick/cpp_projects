@@ -1,70 +1,33 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include "Chunk_gpu.cuh"
-#include "yr_cart.h"
+
 #include <vector>
 #include "OutChunkHeader.h"
 
 #include "Constants.h"
-
-
 #include <chrono>
 
 #include "helper_functions.h"
 #include "helper_cuda.h"
 #include <math_functions.h>
-#include "aux_kernels.cuh"
-#include "Detection.cuh"
-#include "Cleaning.cuh"
 #include <complex>
-
-#include "Fragment.h"
 #include "npy.hpp"
 #include "TelescopeHeader.h"
+#include "Clusterization.cuh"
+#include "Statistical_preprocessing.cuh"
 
 
 extern cudaError_t cudaStatus0 = cudaErrorInvalidDevice;
 
 
-//  
-//#ifdef _WIN32 // Windows
-//
-//#include <Windows.h>
-//
-//    void emitSound(int frequency, int duration) {
-//        Beep(frequency, duration);
-//    }
-//
-//#else // Linux
-//
-//#include <cmath>
-//#include <alsa/asoundlib.h>
-//
-//    void emitSound(int frequency, int duration) {
-//        int rate = 44100; // Sampling rate
-//        snd_pcm_t* handle;
-//        snd_pcm_open(&handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
-//        snd_pcm_set_params(handle, SND_PCM_FORMAT_S16_LE, SND_PCM_ACCESS_RW_INTERLEAVED, 1, rate, 1, 500000);
-//
-//        short buf[rate * duration];
-//
-//        for (int i = 0; i < rate * duration; i++) {
-//            int sample = 32760 * sin(2 * M_PI * frequency * i / rate);
-//            buf[i] = sample;
-//        }
-//
-//        snd_pcm_writei(handle, buf, rate * duration);
-//        snd_pcm_close(handle);
-//    }
-//
-//#endif 
 	size_t free_bytes, total_bytes;
 	cudaError_t cuda_status = cudaMemGetInfo(&free_bytes, &total_bytes);
 
 	extern const unsigned long long TOtal_GPU_Bytes = (long long)free_bytes;
 
 	
-    #define BLOCK_DIM 32//16
+    #define BLOCK_DIM 32
 	CChunk_gpu::~CChunk_gpu()
 	{
 		if (m_pd_arrcoh_dm)
@@ -226,7 +189,7 @@ extern cudaError_t cudaStatus0 = cudaErrorInvalidDevice;
 
 	}
 
-
+//-------------------------------------------------------------------------------------------------------
 void CChunk_gpu::compute_chirp_channel()
 {	
 }
@@ -242,7 +205,7 @@ void CChunk_gpu::create_fft_plans()
 	}
 	int mbin = get_mbin();
 	
-	checkCudaErrors(cufftPlanMany(&m_fftPlanInverse, 1, &mbin, NULL,            1,      mbin, NULL,           1,         mbin, CUFFT_C2C, m_len_sft * m_nfft * m_nchan * m_npol / 2));
+	checkCudaErrors(cufftPlanMany(&m_fftPlanInverse, 1, &mbin, NULL,            1,      mbin, NULL,           1,         mbin, CUFFT_C2C,  m_nfft * m_nchan * m_len_sft * m_npol / 2));
 }
 
 
@@ -257,8 +220,7 @@ void kernel_create_arr_bin_freqs_and_taper(double* d_parr_bin_freqs, double* d_p
 	}
 	double temp = -0.5 * bw_chan + (ind + 0.5) * bw_chan / mbin;
 	d_parr_bin_freqs[ind] = temp;
-	d_parr_taper[ind] = 1.0 / sqrt(1.0 + pow(temp / (0.47 * bw_chan), 80));
-	
+	d_parr_taper[ind] = 1.0 / sqrt(1.0 + pow(temp / (0.47 * bw_chan), 80));	
 }
 //----------------------------------------------------------------------------------------
 __global__
@@ -276,132 +238,198 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 	 double temp = bw_chan * (vi - len_sft / 2.0 + 0.5);
 	d_parr_freqs_chan[ichan * len_sft + col_ind] = freqs_sub + temp;
 }
-	////---------------------------------------------------
+//---------------------------------------------------
+
+// INPUT:
+//pcmparrRawSignalCur - raw signal, complex
+// len = (m_header.m_npol / 2)*m_nfft * m_header.m_nchan  *  m_nbin
+// pcmparrRawSignalCur - is complex-value matrix.
+// rows = (m_header.m_npol / 2)*m_nfft * m_header.m_nchan;
+// cols = m_nbin
+// the first "m_nfft * m_header.m_nchan"  rows of the matrix "pcmparrRawSignalCur " correspond to polarization number 0
+// the second, if "m_npol == 4", correspond to polarization number 1
+// OUTPUT:
+//pvctSuccessHeaders - is not being used, = nullptr
+//  pvecImg - output image
 	bool CChunk_gpu::process(void* pcmparrRawSignalCur
 		, std::vector<COutChunkHeader>* pvctSuccessHeaders, std::vector<std::vector<float>>* pvecImg)
 	{
-		// 1. 
-		const int mbin = get_mbin();
+		// 1. constant's calculation.
+		const int mbin = get_mbin();   // bins after SFFT
 		const int noverlap_per_channel = get_noverlap_per_channel();
-		const int mbin_adjusted = get_mbin_adjusted();
-		const int msamp = get_msamp();
-		const int mchan = m_nchan * m_len_sft;
+		const int mbin_adjusted = get_mbin_adjusted(); // quantity of bins in time domain after unpadding
+		const int msamp = get_msamp(); // bin's quantity of fdmt input in time domain (= fdmt cols)
+		const int mchan = m_nchan * m_len_sft;// rows quantity of fdmt input
 		// 1!
 
 		// 2. Forward FFT execution
+		// pcmparrRawSignalCur - input-output
 		checkCudaErrors(cufftExecC2C(m_fftPlanForward, (cufftComplex*)pcmparrRawSignalCur, (cufftComplex*)pcmparrRawSignalCur, CUFFT_FORWARD));
 		//2!	
-
-		cudaStatus0 = cudaGetLastError();
-		if (cudaStatus0 != cudaSuccess) {
-			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-			return false;
-		}
-	
-
-		//3!
-
+		
+		// 3. main loop.
 		for (int idm = 0; idm < m_coh_dm_Vector.size(); ++idm)
 		{
-			int nc = 1;
-			auto start = std::chrono::high_resolution_clock::now();
-			for (int inc = 0; inc < nc; ++inc)
-			{
-				elementWiseMult(m_pdcmpbuff_ewmulted, (cufftComplex*)pcmparrRawSignalCur, idm);
-			}
-				
 
-			auto end = std::chrono::high_resolution_clock::now();
-			auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-			std::cout << "Time taken by function elementWiseMult: " << duration.count()/nc << " microseconds" << std::endl;
+			// 4. Element wise multiplication - moving phases
+			// OVERLOADED. 
+			// implementation of this function is in "Chunk_fly_gpu.cu"
+			// INPUT:
+			//pcmparrRawSignalCur, size =  m_nfft * m_header.m_nchan * m_nbin * (m_header.m_npol / 2)
+			//    can be represented as 4-dimentional array:  (m_header.m_npol / 2) x m_nfft x m_header.m_nchan x m_nbin 
+			//	 idm - current number of dm		
+			// OUTPUT:
+			// m_pdcmpbuff_ewmulted, , size =  m_nfft * m_header.m_nchan * m_nbin * (m_header.m_npol / 2)
+			//    can be represented as 4-dimentional array:  (m_header.m_npol / 2) x m_nfft x m_header.m_nchan x m_nbin 
+			elementWiseMult(m_pdcmpbuff_ewmulted, (cufftComplex*)pcmparrRawSignalCur, idm);
+			// !4
 
-
-			cudaStatus0 = cudaGetLastError();
-			if (cudaStatus0 != cudaSuccess) {
-				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-				return false;
-			}
+			// 5. Inverse FFT
 			checkCudaErrors(cufftExecC2C(m_fftPlanInverse, m_pdcmpbuff_ewmulted, m_pdcmpbuff_ewmulted, CUFFT_INVERSE));
-			cudaStatus0 = cudaGetLastError();
-			if (cudaStatus0 != cudaSuccess) {
-				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-				return false;
-			}
-
+			// !5
+			
+			// 6. FFT - Normalization  plus summation of polarizations
 			dim3 threads(1024, 1);
 			dim3 blocks((m_nbin + threads.x - 1) / threads.x, m_nfft * m_nchan );
+			//OUTPUT:
+			// m_pdbuff_rolled - is intensity matrix, not yet unpadded, size =  m_nfft * m_nchan  * m_nbin		 
 			roll_rows_normalize_sum_kernel << <blocks, threads >> > (m_pdbuff_rolled, m_pdcmpbuff_ewmulted, m_npol, m_nfft * m_nchan, m_nbin, m_nbin / 2);
-			cudaDeviceSynchronize();
-
-
-			cudaStatus0 = cudaGetLastError();
-			if (cudaStatus0 != cudaSuccess) {
-				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-				return false;
-			}
-			/*int lenarr4 = msamp * m_nchan * m_len_sft;
-			std::vector<float> data4(lenarr4, 0);
-			cudaMemcpy(data4.data(), (float*)m_pdbuff_rolled, lenarr4 * sizeof(float), cudaMemcpyDeviceToHost);
-			cudaDeviceSynchronize();
-			std::array<long unsigned, 1> leshape2{ lenarr4 };
-			npy::SaveArrayAsNumpy("parr_wfall_py.npy", false, leshape2.size(), leshape2.data(), data4);
-			int ii = 0;*/
-
-
-			int noverlap_per_channel = get_noverlap_per_channel();
-			int mbin_adjusted = get_mbin_adjusted();
-			// result stored in m_pdbuff_rolled	
-			float* fbuf = (float*)m_pdcmpbuff_ewmulted;
-
-
+			// !6
+			
+			// 7. Transposition submarices and unpadding
+			// OUTPUT: fbuf is float matrix with dimensions: (m_nchan * m_len_sft) x msamp
+			// INPUT:  m_pdbuff_rolled - can be interpreted as 4-dim matrix: m_nfft x m_nchan   x mbin x  m_len_sft
+			// or (m_nfft x m_nchan ) matrices, each with dimension  mbin x m_len_sft written consequently in memory.
+			// there are being done the following manipulations with this matrix:
+			// 1. each of these  (m_nfft x m_nchan ) matrices is being transposed to  m_len_sft x mbin
+			// 2. each of these resulting matrices is being unpadded from each side with "noverlap_per_channel"
+			float* fbuf = (float*)m_pdcmpbuff_ewmulted;			
 			dim3 threads_per_block1(512, 1, 1);
 			dim3 blocks_per_grid1((mbin_adjusted + threads_per_block1.x - 1) / threads_per_block1.x, m_nchan * m_len_sft, m_nfft);
-
-			transpose_unpadd_intensity__ << < blocks_per_grid1, threads_per_block1 >> > (fbuf, m_pdbuff_rolled, m_nfft, noverlap_per_channel
+			transpose_unpadd_intensity << < blocks_per_grid1, threads_per_block1 >> > (fbuf, m_pdbuff_rolled, m_nfft, noverlap_per_channel
 				, mbin_adjusted, m_nchan, m_len_sft, mbin);
+			// !7
 
-			cudaDeviceSynchronize();	
-			cudaStatus0 = cudaGetLastError();
-			if (cudaStatus0 != cudaSuccess) {
-				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-				return false;
-			}
-
+			// 8. calculation dedispersion shift for each row and perfoming corresponding shift
 			float* parr_wfall_disp = m_pdbuff_rolled;
 			double val_tsamp_wfall = (double)(m_len_sft * m_tsamp);
 			double val_dm = m_coh_dm_Vector[idm];
-			double f0 = ((double)m_Fmax - (double)m_Fmin) / (m_nchan * m_len_sft);
+			double f0 = (static_cast<double>(m_Fmax) - static_cast<double>(m_Fmin)) / (m_nchan * m_len_sft);
 			dim3 threadsPerblock1(1024, 1, 1);
 			dim3 blocksPerGrid1((msamp + threadsPerblock1.x - 1) / threadsPerblock1.x, m_nchan * m_len_sft, 1);
 			dedisperse << <  blocksPerGrid1, threadsPerblock1 >> > (parr_wfall_disp, fbuf, val_dm
 				, (double)m_Fmin, (double)m_Fmax, val_tsamp_wfall, f0, msamp);
-			cudaDeviceSynchronize();
-			cudaStatus0 = cudaGetLastError();
-			if (cudaStatus0 != cudaSuccess) {
-				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-				return false;
-			}
+			// !8
+			
+			// 9. Memory allocation for input to calculate fdmt-norm
+			float* d_buff = reinterpret_cast<float*>(m_pdcmpbuff_ewmulted);
+			float* d_parr_wfall_normInput = nullptr;
+			cudaMalloc((void**)&d_parr_wfall_normInput, sizeof(float) * m_nchan * m_len_sft * msamp);
+			// !9
 
-			/*int lenarr4 = msamp * m_nchan * m_len_sft;
-			std::vector<float> data4(lenarr4, 0);
-			cudaMemcpy(data4.data(), parr_wfall, lenarr4 * sizeof(float), cudaMemcpyDeviceToHost);
-			cudaDeviceSynchronize();
-			std::array<long unsigned, 1> leshape2{ lenarr4 };
-			npy::SaveArrayAsNumpy("parr_wfall_py.npy", false, leshape2.size(), leshape2.data(), data4);
-			int ii = 0;*/
+			// 10. statistical preprocessing/cleaning input fdmt matrix
+			// Explanations:
+			// parr_wfall_disp - intensivity matrix, dimentions: m_nchan * m_len_sft x  msamp
+			// d_parr_wfall_normInput - input matrix to calculate normalization-fdmt matrix.
+			//   if some element of the matrix parr_wfall_disp is being excluded (=0), then 
+			//  element of d_parr_wfall_normInput with the same index should be set to 0.0f.  Otherwise set to 1.0f
+			// d_buff - auxillary memory buffer, size = 4 + 2 *  m_nchan * m_len_sft
+			statistical_preprocessing::calc_fdmt_inputs(parr_wfall_disp, m_nchan * m_len_sft, msamp
+				, d_buff, d_parr_wfall_normInput);
+			// !10
 
+			// 11. memory allocation for normalization fdmt matrix
+			float* d_parr_wfall_norm = nullptr;
+			cudaMalloc((void**)&d_parr_wfall_norm, msamp * m_len_sft * sizeof(float));
+			// !11
+
+			// 12. calculation normalization fdmt matrix
+			m_Fdmt.process_image(d_parr_wfall_normInput, d_parr_wfall_norm, false);
+			// !12
+
+			// 13. fdmt calculation
 			m_Fdmt.process_image(parr_wfall_disp, &m_pdoutImg[idm * msamp * m_len_sft], false);
-
-			cudaStatus0 = cudaGetLastError();
-			if (cudaStatus0 != cudaSuccess)
-			{
-				fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-				return false;
-			}
-
-			//
-
+			// !13
+			
+			// 14.normalization fdmt with fdmt-nomalization matrix:  fdmt = fdmt/sqrt(fdmt_norm)			
+			fdmt_normalization << <(msamp * m_len_sft + 1024 - 1) / 1024, 1024 >> > 
+				(&m_pdoutImg[idm * msamp * m_len_sft], d_parr_wfall_norm, msamp * m_len_sft, &m_pdoutImg[idm * msamp * m_len_sft]);			
+			//!14
+			cudaFree(d_parr_wfall_norm);
+			cudaFree(d_parr_wfall_normInput);
 		}
+		
+		 // 15. defining metrics array on host and device
+		thrust::host_vector<int> h_bin_metrics(3);
+		h_bin_metrics[0] = 2 * m_length_sum_wnd;
+		h_bin_metrics[1] = 2 *m_length_sum_wnd;
+		h_bin_metrics[2] = 4;
+
+		thrust::device_vector<int> d_bin_metrics(h_bin_metrics.size());
+		d_bin_metrics = h_bin_metrics;
+		const int* d_pbin_metrics = thrust::raw_pointer_cast(d_bin_metrics.data());
+
+		// 16. treshold	 --> GPU
+		float* d_pTresh;   		
+		cudaMalloc((void**)&d_pTresh, sizeof(float));
+		cudaMemcpy(d_pTresh, &m_sigma_bound, sizeof(float), cudaMemcpyHostToDevice);
+		
+		// 17. Gathering candidates in an device array "d_parrCand"
+		std::string filename = "output_";
+		std::ostringstream oss;
+		oss << filename << m_Block_id << "_ " << m_Chunk_id << ".log";
+		filename = oss.str();
+		const int QUantPower2_Wnd = 4;
+		Cand* d_parrCand = nullptr;
+		unsigned int h_quantCand = 0;
+		clusterization::gather_candidates_in_dynamicalArray(m_pdoutImg // fdmt output image, input
+			, m_len_sft* m_coh_dm_Vector.size() // quant rows of m_pdoutImg, input 
+			, msamp // quant columns of m_pdoutImg, input 
+			, *d_pTresh // device allocated detection's threshold , input 
+			, QUantPower2_Wnd // windows{pow(2,0), pow(2,1),.., pow(2,QUantPower2_Wnd-1)}, input 
+			, &d_parrCand // array with candidates, device allocated, structure Cand is declared in Candidate.cuh
+			                           // output
+			, &h_quantCand// size of d_parrCand, device allocated variable, output
+		);
+
+		cudaFree(d_parrCand);
+
+		/*----------------------------------------------------------------*/
+		/*----------------------------------------------------------------*/
+		/*------ OPTION FOR CLUSTERIZATION ----------------------------------------------------------*/
+		/*----------------------------------------------------------------*/
+		/*----------------------------------------------------------------*/
+
+		// defining clasterization's splitters
+		
+	
+	thrust::host_vector<int> h_bin_splitters(3);
+		h_bin_splitters[0] = 2;
+		h_bin_splitters[1] = 1;
+		h_bin_splitters[2] = 2;
+
+		thrust::device_vector<int> d_bin_splitters(h_bin_splitters.size());
+		d_bin_splitters = h_bin_splitters;
+		//!
+		std::string outfile{ "candidates.log" };
+		const float t_chunkBegin = 0.0; // time of beginning the chunk
+		clusterization::clusterization_main(m_pdoutImg // fdmt output image, input
+			, m_len_sft* m_coh_dm_Vector.size() // quant rows of m_pdoutImg, input 
+			, msamp // quant columns of m_pdoutImg, input 
+			, *d_pTresh // device allocated detection's threshold , input 
+			, QUantPower2_Wnd // windows{1,2,..,QUantPower2_Wnd-1}, input 
+			,thrust::raw_pointer_cast(d_bin_splitters.data())
+			, outfile
+			, m_tsamp *m_len_sft // array with candidates, device allocated, structure Cand is declared in Candidate.cuh
+			,t_chunkBegin
+		); 
+		
+		
+		/*----------------------------------------------------------------------------------------------------*/
+		/*----------------------------------------------------------------------------------------------------*/
+		/*---------  this code is being used for visualization in my application the only -----------------------------*/
+		/*----------------------------------------------------------------------------------------------------*/
+		/*----------------------------------------------------------------------------------------------------*/
 
 		std::vector<std::vector<float>>* pvecImg_temp = nullptr;
 		if (nullptr != pvecImg)
@@ -426,19 +454,28 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 		{
 			cudaMemcpy(pvecImg_temp->at(i).data(), &m_pdoutImg[i * msamp * m_len_sft], msamp * m_len_sft * sizeof(float), cudaMemcpyDeviceToHost);
 		}
-		cudaStatus0 = cudaGetLastError();
-		if (cudaStatus0 != cudaSuccess) {
-			fprintf(stderr, "cudaGetLastError failed: %s\n", cudaGetErrorString(cudaStatus0));
-			return false;
-		}
+		/*--------- !  this code is for visualization in my application----------------------------------------------------------------*/ 
+
 		return true;
 	}
 	//---------------------------------------------------------------------------------------
-	//---------------------------------------------------------------------------
+	// INPUT:
+	//arr - matrix with dimentions:  (npol *rows) x cols
+	// shift - shifting value, in our case shift = cols/2
+	// npol - polarizations, = 2 OR 4
+	// OUTPUT:
+	// arr_rez - matrix of intesivities, dementions: rows x cols
+	//Functionality:
+	// 1. shifts every row
+	// 2. calculates intensivity: re*re + im * im for each element
+	// 3. if npol == 4 adds matrices M0+M1 for polarization 0 and 1
+	// 4. fft-normalization, dividing on "cols"
+	// Sample for call:
+	//dim3 threads(1024, 1);
+	//dim3 blocks((m_nbin + threads.x - 1) / threads.x, m_nfft* m_nchan);
 	__global__ void roll_rows_normalize_sum_kernel(float* arr_rez, cufftComplex* arr, const int npol, const int rows
 		, const  int cols, const  int shift)
 	{
-
 		int idx0 = blockIdx.x * blockDim.x + threadIdx.x;
 		if (idx0 >= cols)
 		{
@@ -449,44 +486,34 @@ void kernel_create_arr_freqs_chan(double* d_parr_freqs_chan, int len_sft, double
 		arr_rez[ind_new] = 0.0f;
 		for (int ipol = 0; ipol < npol / 2; ++ipol)
 		{
-			double x = (double)arr[ind].x;
-			double y = (double)arr[ind].y;
-			arr_rez[ind_new] += float((x * x + y * y) / cols / cols);
+			double x = static_cast<double>(arr[ind].x);
+			double y = static_cast<double>(arr[ind].y);
+			arr_rez[ind_new] += static_cast<float>((x * x + y * y) / cols / cols);
 			ind += rows * cols;
 		}
 	}
 //------------------------------------------------------------------
 
-	__global__ 	void  transpose_unpadd_intensity__(float* fbuf, float* arin, int nfft, int noverlap_per_channel
-		, int mbin_adjusted, const int nsub, const int nchan, int mbin)
+__global__ 	void  transpose_unpadd_intensity(float* arout, float* arin, int nfft, int noverlap_per_channel
+	, int mbin_adjusted, const int nsub, const int nchan, int mbin)
+{
+	int  ibin = blockIdx.x * blockDim.x + threadIdx.x;
+	if (!(ibin < mbin_adjusted))
 	{
-		int  ibin = blockIdx.x * blockDim.x + threadIdx.x;
-		if (!(ibin < mbin_adjusted))
-		{
-			return;
-		}
-
-		int ifft = blockIdx.z;
-		int isub = blockIdx.y / nchan;
-		int ichan = blockIdx.y % nchan;
-		int ibin_adjusted = ibin + noverlap_per_channel;
-		int isamp = ibin + mbin_adjusted * ifft;
-		int msamp = mbin_adjusted * nfft;
-
-		// Select bins from valid region and reverse the frequency axis		
-		// printf("ipol = %i   ifft =  %i\n", ipol, ifft);
-		int iinp = ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted;
-		int iout = (isub * nchan + nchan - ichan - 1) * msamp + isamp;
-		//isamp * nsub * nchan + isub * nchan + nchan - ichan - 1;
-	// Select bins from valid region and reverse the frequency axis		
-
-		if ((ifft == 0) && (isub == 0) && (ichan == 0) && (ibin < 10))
-		{
-			//printf("ibin = %i  arin[iinp] = %f\n", ibin, arin[iinp]);
-		}
-		fbuf[iout] = arin[iinp];
-
+		return;
 	}
+	int ifft = blockIdx.z;
+	int isub = blockIdx.y / nchan;
+	int ichan = blockIdx.y % nchan;
+	int ibin_adjusted = ibin + noverlap_per_channel;
+	int isamp = ibin + mbin_adjusted * ifft;
+	int msamp = mbin_adjusted * nfft;
+
+	// Select bins from valid region and reverse the frequency axis				
+	int iinp = ifft * nsub * nchan * mbin + (nsub - isub - 1) * nchan * mbin + ichan * mbin + ibin_adjusted;
+	int iout = (isub * nchan + nchan - ichan - 1) * msamp + isamp;	
+	arout[iout] = arin[iinp];
+}
 //------------------------------------------------------------
 __global__
 void calc_intensity_kernel  (float *intensity, const int len, const int npol, cufftComplex* fbuf)
@@ -569,6 +596,20 @@ void calcPowerMtrx_kernel(float* output, const int height, const int width, cons
 }
 
 //-----------------------------------------------------------------------------
+
+// INPUT:
+// parrIntesity - matrix with dimensions = (blocksPerGrid1.y) x cols
+// -dm - currtent dispersion measure
+// f_min, f_max - bounding frequensies
+// val_tsamp_wfall - value of time-bin
+// OUTPUT:
+// parr_wfall_disp  - matrix with dimensions = (blocksPerGrid1.y) x cols
+// functionality:
+// 1. for each row of input matrix is being calculated integer value for shifting - "ishift"
+// 2. row is being shifted in accordance with "ishift"
+// sample for call:
+//dim3 threadsPerblock1(1024, 1, 1);
+//dim3 blocksPerGrid1((msamp + threadsPerblock1.x - 1) / threadsPerblock1.x, m_nchan* m_len_sft, 1);
 __global__
 void dedisperse(float*parr_wfall_disp, float* parrIntesity, double dm,  double f_min, double f_max, double   val_tsamp_wfall, double foff, int cols)
 {
@@ -616,10 +657,7 @@ __global__	void  transpose_unpadd_kernel(cufftComplex* fbuf, cufftComplex* arin,
 	fbuf[iout].y = arin[iinp].y;
 
 }
-
-
 //-------------------------------------------------------------------
-
 __global__	void  transpose_unpadd_kernel_(float* fbuf, cufftComplex* arin, int nfft, int npol, int noverlap_per_channel
 	, int mbin_adjusted, const int nsub, const int nchan, const int mbin)
 {
@@ -649,8 +687,6 @@ __global__	void  transpose_unpadd_kernel_(float* fbuf, cufftComplex* arin, int n
 	}
 
 }
-
-
 	//-----------------------------------------------------------------------
 	__global__ void  divide_cufftComplex_array_kernel(cufftComplex* d_arr, int len, float val)
 	{
@@ -712,242 +748,6 @@ __global__ void roll_rows_and_normalize_kernel(cufftComplex* arr_rez, cufftCompl
 	arr_rez[ind_new].y = arr[ind].y / cols;
 
 }
-
-
-//-----------------------------------------------------------------
-
-long long CChunk_gpu::calcLenChunk_(CTelescopeHeader header, const int nsft
-	, const float pulse_length, const float d_max)
-{
-	const int nchan_actual = nsft * header.m_nchan;
-
-	long long len = 0;
-	for (len = 1 << 9; len < 1 << 30; len <<= 1)
-	{
-		// iMaxDt !!!!! ???????????????? 
-		CFdmtGpu fdmt(
-			header.m_centfreq - header.m_chanBW * header.m_nchan / 2.
-			, header.m_centfreq + header.m_chanBW * header.m_nchan / 2.
-			, nchan_actual
-			, len
-			, nchan_actual
-		);
-
-		
-		long long size0 = fdmt.calcSizeAuxBuff_fdmt_();
-		long long size_fdmt_inp = fdmt.calc_size_input();
-		long long size_fdmt_out = fdmt.calc_size_output();
-		long long size_fdmt_norm = size_fdmt_out;
-		long long irest = header.m_nchan * header.m_npol * header.m_nbits / 8 // input buff
-			+ header.m_nchan * header.m_npol / 2 * sizeof(cufftComplex)
-			+ 3 * header.m_nchan * header.m_npol * sizeof(cufftComplex) / 2
-			+ 2 * header.m_nchan * sizeof(float);
-		irest *= len;
-
-		long long rez = size0 + size_fdmt_inp + size_fdmt_out + size_fdmt_norm + irest;
-		if (rez > 0.98 * TOtal_GPU_Bytes)
-		{
-			return len / 2;
-		}
-
-	}
-	return -1;
-}
-
-
-//--------------------------------------------------------------------
-//INPUT:
-//1. pcarrTemp - complex array with total length  = m_nbin * (m_npol/2)* m_nchan
-// pcarrTemp can be interpreted as matrix, consisting of  m_nchan *(m_npol/2) rows
-// each row consists of m_len_sft subrows corresponding to m_len_sft subfrequencies
-// 2.pAuxBuff - auxillary buffer to compute mean and dispersions of each row ofoutput matrix d_parr_fdmt_inp
-//OUTPUT:
-//d_parr_fdmt_inp - matrix with dimensions (m_nchan*m_len_sft) x (m_nbin/m_len_sft)
-// d_parr_fdmt_inp[i][j] = 
-//
-void CChunk_gpu::calc_fdmt_inp(fdmt_type_* d_parr_fdmt_inp, cufftComplex* pcarrTemp
-	, float*pAuxBuff)
-{	
-	
-	/*dim3 threadsPerChunk(TILE_DIM, TILE_DIM, 1);
-	dim3 ChunksPerGrid((m_len_sft + TILE_DIM - 1) / TILE_DIM, (m_nbin / m_len_sft + TILE_DIM - 1) / TILE_DIM, m_nchan);
-	size_t sz = TILE_DIM * (TILE_DIM + 1) * sizeof(float);
-	float* d_parr_fdmt_inp_flt = pAuxBuff;	
-	calcPowerMtrx_kernel << < ChunksPerGrid, threadsPerChunk, sz >> > (d_parr_fdmt_inp_flt, m_nbin/ m_len_sft, m_len_sft, m_npol, pcarrTemp);
-	cudaDeviceSynchronize();*/
-
-
-	//std::vector<float> data0(m_nbin, 0);
-	//cudaMemcpy(data0.data(), d_parr_fdmt_inp_flt, m_nbin * sizeof(float),
-	//	cudaMemcpyDeviceToHost);
-	//cudaDeviceSynchronize();
-	//float valmax = 0., valmin = 0.;
-	//unsigned int iargmax = 0, iargmin = 0;
-	//findMaxMinOfArray(data0.data(), data0.size(), &valmax, &valmin
-	//	, &iargmax, &iargmin);
-	float* d_parr_fdmt_temp = pAuxBuff;
-	dim3 threadsPerChunk(1024, 1, 1);
-	dim3 ChunksPerGrid((m_nbin * threadsPerChunk.x - 1) / threadsPerChunk.x, m_nchan, 1);
-	calcPartSum_kernel<<< ChunksPerGrid, threadsPerChunk>>>(d_parr_fdmt_temp, m_nbin, m_npol/2, pcarrTemp);
-	cudaDeviceSynchronize();
-
-	/*std::vector<float> data0(m_nbin, 0);
-	cudaMemcpy(data0.data(), d_parr_fdmt_temp, m_nbin * sizeof(float),
-		cudaMemcpyDeviceToHost);*/
-
-	float* d_parr_fdmt_inp_flt = d_parr_fdmt_temp + m_nbin * m_nchan;
-	dim3 threadsPerBlock1(TILE_DIM, TILE_DIM, 1);
-	dim3 blocksPerGrid1((m_len_sft + TILE_DIM - 1) / TILE_DIM, (m_nbin / m_len_sft + TILE_DIM - 1) / TILE_DIM, m_nchan);
-	size_t sz = TILE_DIM * (TILE_DIM + 1) * sizeof(float);
-	multiTransp_kernel << < blocksPerGrid1, threadsPerBlock1, sz >> > (d_parr_fdmt_inp_flt, m_nbin / m_len_sft, m_len_sft, d_parr_fdmt_temp);
-	cudaDeviceSynchronize();
-
-	/*std::vector<float> data6(m_nbin, 0);
-	cudaMemcpy(data6.data(), d_parr_fdmt_inp_flt, m_nbin * sizeof(float),
-		cudaMemcpyDeviceToHost);*/
-	int nFdmtRows = m_nchan * m_len_sft;
-	int nFdmtCols = m_nbin / m_len_sft;
-	float* d_arrRowMean = (float*)pcarrTemp;
-	float* d_arrRowDisp = d_arrRowMean + nFdmtRows;
-	
-	
-	auto start = std::chrono::high_resolution_clock::now();
-
-	// Calculate mean and variance
-	float* pval_mean = d_arrRowDisp + nFdmtRows;
-	float* pval_stdDev = pval_mean + 1;
-	float* pval_dispMean = pval_stdDev + 1;
-	float* pval_dispStd = pval_dispMean + 1;
-	
-
-	ChunksPerGrid = nFdmtRows;
-	int treadsPerChunk = calcThreadsForMean_and_Disp(nFdmtCols);
-	size_t sz1 = (2 * sizeof(float) + sizeof(int)) * treadsPerChunk;
-	// 1. calculations mean values and dispersions for each row of matrix d_parr_fdmt_inp_flt
-	// d_arrRowMean - array contents  mean values of each row of input matrix pcarrTemp
-	// d_arrRowDisp - array contents  dispersions of each row of input matrix pcarrTemp
-	
-	calcRowMeanAndDisp << < ChunksPerGrid, treadsPerChunk, sz1 >> > (d_parr_fdmt_inp_flt, nFdmtRows, nFdmtCols, d_arrRowMean, d_arrRowDisp);
-	cudaDeviceSynchronize();
-
-	/*std::vector<float> data4(nRows, 0);
-	cudaMemcpy(data4.data(), d_arrRowDisp, nRows * sizeof(float),
-		cudaMemcpyDeviceToHost);
-	cudaDeviceSynchronize();
-
-	std::vector<float> data5(nRows, 0);
-	cudaMemcpy(data5.data(), d_arrRowMean, nRows * sizeof(float),
-		cudaMemcpyDeviceToHost);
-	cudaDeviceSynchronize();*/
-
-	//float* parr_fdmt_inp_flt = (float*)malloc(nRows* nCols *sizeof(float));
-	//cudaMemcpy(parr_fdmt_inp_flt, d_parr_fdmt_inp_flt, nRows * nCols * sizeof(float), cudaMemcpyDeviceToHost);
-	//float* arrM = (float*)malloc(nRows * sizeof(float));
-	//float* arrD = (float*)malloc(nRows * sizeof(float));
-	//memset(arrM, 0, nRows * sizeof(float));
-	//memset(arrD, 0, nRows * sizeof(float));
-	//for (int i = 0; i < nRows; ++i)
-	//{
-	//	for (int j = 0; j < nCols; ++j)
-	//	{
-	//		arrM[i] += parr_fdmt_inp_flt[i * nCols + j];
-	//		arrD[i] += parr_fdmt_inp_flt[i * nCols + j] * parr_fdmt_inp_flt[i * nCols + j];
-	//	}
-	//	arrM[i] = arrM[i] / ((float)nCols);
-	//	arrD[i] = arrD[i] / ((float)nCols) - arrM[i] * arrM[i];
-
-	//}
-
-
-	//free(parr_fdmt_inp_flt);
-	//free(arrM);
-	//free(arrD);
-	// 2. calculations mean value and standart deviation for full matrix pcarrTemp
-	// it is demanded to normalize matrix pcarrTemp
-	ChunksPerGrid = 1;
-	treadsPerChunk = calcThreadsForMean_and_Disp(nFdmtRows);
-	sz = treadsPerChunk * (2 * sizeof(float) + sizeof(int));
-	kernel_OneSM_Mean_and_Std << <ChunksPerGrid, treadsPerChunk, sz >> > (d_arrRowMean, d_arrRowDisp, nFdmtRows
-		, pval_mean, pval_stdDev);
-	cudaDeviceSynchronize();
-
-	//
-
-	float mean = -1., disp = -1.;
-	cudaMemcpy(&mean, pval_mean, sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(&disp, pval_stdDev, sizeof(float), cudaMemcpyDeviceToHost);
-
-	//// check up
-	//float* arrmean = (float*)malloc(nRows * sizeof(float));
-	//float* arrdisp = (float*)malloc(nRows * sizeof(float));
-	//cudaMemcpy(arrmean, d_arrRowMean, nRows * sizeof(float), cudaMemcpyDeviceToHost);
-	//cudaMemcpy(arrdisp, d_arrRowDisp, nRows * sizeof(float), cudaMemcpyDeviceToHost);
-	//float sum = 0.;
-	//for (int i = 0; i < nRows; ++i)
-	//{
-	//	sum += arrmean[i];
-	//}
-	//sum = sum / ((float)nRows);
-
-	//float disp1 = 0;
-	//for (int i = 0; i < nRows; ++i)
-	//{
-	//	disp1 += arrmean[i] * arrmean[i] + arrdisp[i];// (arrmean[i] - sum)* (arrmean[i] - sum);
-	//}
-	//disp1 = disp1/ ((float)nRows) - sum*sum;
-
-	//free(arrmean);
-	//free(arrdisp);
-
-
-	// 3. calculations mean value and standart deviation for array d_arrRowDisp
-	// it is demanded to clean out tresh from matrix pcarrTemp
-	auto end = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-	
-	
-	
-	int threads = 128;
-	calculateMeanAndSTD_for_oneDimArray_kernel << <1, threads, threads * 2 * sizeof(float) >> > (d_arrRowDisp, nFdmtRows, pval_dispMean, pval_dispStd);
-	cudaDeviceSynchronize();
-
-	/*float hval_dispMean = -1;
-	float hval_dispStd = -1;
-	cudaMemcpy(&hval_dispMean, pval_dispMean, sizeof(float), cudaMemcpyDeviceToHost);
-	cudaMemcpy(&hval_dispStd, pval_dispStd, sizeof(float), cudaMemcpyDeviceToHost);
-	cudaDeviceSynchronize();
-	pval_dispMean = NULL;
-	pval_dispStd = NULL;*/
-
-	// 4.Clean and normalize array
-	const dim3 Totalsize(256, 1, 1);
-	const dim3 gridSize(1, nFdmtRows, 1);
-	
-	
-
-	normalize_and_clean << < gridSize, Totalsize >> >
-		(d_parr_fdmt_inp, d_parr_fdmt_inp_flt, nFdmtRows, nFdmtCols
-		, pval_mean, pval_stdDev, d_arrRowDisp, pval_dispMean, pval_dispStd  );	
-	cudaDeviceSynchronize();
-
-	float* parr_fdmt_inp = (float*)malloc(nFdmtRows * nFdmtCols * sizeof(float));
-	cudaMemcpy(parr_fdmt_inp, d_parr_fdmt_inp, nFdmtRows* nFdmtCols * sizeof(float), cudaMemcpyDeviceToHost);
-
-	//float valmax = -0., valmin = 0.;
-	//unsigned int iargmax = -1, iargmin = -1;
-	//findMaxMinOfArray(parr_fdmt_inp, nRows * nCols, &valmax,  &valmin
-	//	, &iargmax, &iargmin);
-
-	//auto end1 = std::chrono::high_resolution_clock::now();
-	//auto duration1 = std::chrono::duration_cast<std::chrono::microseconds>(end1 - end);
-	//iNormalize_time += duration1.count();
-	//free(parr_fdmt_inp);
-
-	d_arrRowMean = NULL;
-	d_arrRowDisp = NULL;
-	pval_mean = NULL;	
-	pval_stdDev = NULL;
-}
 //--------------------------------------
 void CChunk_gpu::set_chunkid(const int nC)
 {
@@ -961,18 +761,10 @@ void CChunk_gpu::set_blockid(const int nC)
 //-------------------------------------------------------------------
 __device__
 float fnc_norm2(cufftComplex* pc)
-{
-	/*float x = (*pc).x * 1.0e4;
-	float y = (*pc).y * 1.0e4;
-	return x* x + y * y;*/
+{	
 	return ((*pc).x * (*pc).x + (*pc).y * (*pc).y);
 }
-
-
-
-
 //----------------------------------------------------
-
 __global__
 void calcMultiTransposition_kernel(fdmt_type_* output, const int height, const int width, fdmt_type_* input)
 {
@@ -1044,198 +836,7 @@ void multiTransp_kernel(float* output, const int height, const int width, float*
 	}
 }
 
-//---------------------------------------------------------------
 
-__global__ 
-void normalize_and_clean(fdmt_type_* parrOut, float* d_arr, const int NRows, const int NCols
-	,float *pmean, float *pstd, float* d_arrRowDisp, float *pmeanDisp, float *pstdDisp)
-{
-	__shared__ int sbad[1];
-	unsigned int i = threadIdx.x;
-	unsigned int irow = blockIdx.y;
-	if (i >= NCols)
-	{
-		return;
-	}
-	if (fabs(d_arrRowDisp[irow] - *pmeanDisp) > 4. * (*pstdDisp))
-	{
-		sbad[0] = 1;
-	}
-	else
-	{
-		sbad[0] = 0;
-	}
-	//--------------------------------
-	if (sbad[0] == 1)
-	{
-		while (i < NCols)
-		{
-			parrOut[irow * NCols + i] = 0;
-			i += blockDim.x;
-		}
-	}
-	else
-	{
-		while (i < NCols)
-		{
-			parrOut[irow * NCols + i] = (fdmt_type_)((d_arr[irow * NCols + i] - (*pmean) )/((*pstd )));
-			i += blockDim.x;
-		}
-	}
-	
-
-}
-
-//-------------------------------------------
-void CChunk_gpu::preparations_and_memoryAllocations(CTelescopeHeader header
-	, const float pulse_length
-	, const float d_max
-	, const float sigma_bound
-	, const int length_sum_wnd
-	, int* pLenChunk
-	, cufftHandle* pplan0, cufftHandle* pplan1, CFdmtU* pfdmt, char** d_pparrInput, cufftComplex** ppcmparrRawSignalCur
-	, void** ppAuxBuff_fdmt, fdmt_type_** d_parrfdmt_norm
-	, cufftComplex** ppcarrTemp
-	, cufftComplex** ppcarrCD_Out
-	, cufftComplex** ppcarrBuff, char** ppInpOutBuffFdmt,  CChunk_gpu** ppChunk)
-{
-	//cudaError_t cudaStatus;
-	//const float VAlFmin = header.m_centfreq - ((float)header.m_nchan) * header.m_chanBW / 2.0;
-	//const float VAlFmax = header.m_centfreq + ((float)header.m_nchan) * header.m_chanBW / 2.0;
-	//// 3.2 calculate standard len_sft and LenChunk    
-	//const int len_sft = calc_len_sft(fabs(header.m_chanBW), pulse_length);
-	//*pLenChunk = calcLenChunk_(header, len_sft, pulse_length, d_max);
-
-
-	//// 3.3 cuFFT plans preparations
-
-	//cufftCreate(pplan0);
-	//checkCudaErrors(cufftPlan1d(pplan0, *pLenChunk, CUFFT_C2C, header.m_nchan * header.m_npol / 2));
-
-
-	//
-	//cufftCreate(pplan1);
-	//checkCudaErrors(cufftPlan1d(pplan1, len_sft, CUFFT_C2C, (*pLenChunk) * header.m_nchan * header.m_npol / 2 / len_sft));
-	//
-
-
-	//// !3
-
-	//// 4. memory allocation in GPU
-	//// total number of downloding bytes to each file:
-	//const long long QUantDownloadingBytesForChunk = (*pLenChunk) * header.m_nchan / 8 * header.m_nbits* header.m_npol;
-
-	//const long long QUantBlockComplexNumbers = (*pLenChunk) * header.m_nchan * header.m_npol / 2;
-
-
-
-	//checkCudaErrors(cudaMallocManaged((void**)d_pparrInput, QUantDownloadingBytesForChunk * sizeof(char)));
-
-
-	//checkCudaErrors(cudaMalloc((void**)ppcmparrRawSignalCur, QUantBlockComplexNumbers * sizeof(cufftComplex)));
-	//// 2!
-
-	//
-
-	//// 4.memory allocation for auxillary buffer for fdmt   
-	//   // there is  quantity of real channels
-	//const int NChan_fdmt_act = len_sft * header.m_nchan;
-	//(*pfdmt) = CFdmtU(
-	//	VAlFmin
-	//	, VAlFmax
-	//	, NChan_fdmt_act
-	//	, (*pLenChunk) / len_sft
-	//	, pulse_length
-	//	, d_max
-	//	, len_sft);
-
-	//
-
-	//size_t szBuff_fdmt = pfdmt->calcSizeAuxBuff_fdmt_();
-
-	//checkCudaErrors(cudaMalloc(ppAuxBuff_fdmt, szBuff_fdmt));
-	//// 4!
-	//
-
-	//// 3. memory allocation for fdmt_ones on GPU  ????
-	//size_t szBuff_fdmt_output = pfdmt->calc_size_output();
-
-	//checkCudaErrors(cudaMalloc((void**)d_parrfdmt_norm, szBuff_fdmt_output));
-	////// 6. calculation fdmt ones
-	//pfdmt->process_image(nullptr      // on-device input image
-	//	, *ppAuxBuff_fdmt
-	//	, *d_parrfdmt_norm	// OUTPUT image,
-	//	, true);
-
-	//// 3!
-
-	//
-
-
-	//// 5. memory allocation for the 3 auxillary cufftComplex  arrays on GPU	
-	////cufftComplex* pffted_rowsignal = NULL; //1	
-
-
-
-	//checkCudaErrors(cudaMalloc((void**)ppcarrTemp, QUantBlockComplexNumbers * sizeof(cufftComplex)));
-
-	//checkCudaErrors(cudaMalloc((void**)ppcarrCD_Out, QUantBlockComplexNumbers * sizeof(cufftComplex)));
-
-	//checkCudaErrors(cudaMalloc((void**)ppcarrBuff, QUantBlockComplexNumbers * sizeof(cufftComplex)));
-	//// !5
-	//
-	//// 5. memory allocation for the 2 auxillary arrays on GPU for input and output of FDMT	
-	//size_t szInpOut_fdmt = pfdmt->calc_size_output() + pfdmt->calc_size_input();
-
-	//checkCudaErrors(cudaMalloc((void**)ppInpOutBuffFdmt, szInpOut_fdmt));
-
-	//// 5!
-	//
-	//// !4	
-	//**ppChunk = CChunk_gpu(
-	//	VAlFmin
-	//	, VAlFmax
-	//	, header.m_npol
-	//	, header.m_nchan
-	//	, (*pLenChunk)
-	//	, len_sft
-	//	, 0
-	//	, 0
-	//	, header.m_nbits
-	//	, d_max
-	//	, sigma_bound
-	//	, length_sum_wnd
-	//	, *pfdmt
-	//	, pulse_length
-	//);
-	//
-}
-//-----------------------------------------------------------------------------------------
-void windowization(float* d_fdmt_normalized, const int Rows, const int Cols, const int width, float* parrImage)
-{
-	for (int i = 0; i < Rows; ++i)
-	{
-		for (int j = 0; j < Cols; ++j)
-		{
-			
-			float sum = 0.;
-			for (int k = 0; k < width; ++k)
-			{
-				if ((j + k) < Cols)
-				{
-					sum += d_fdmt_normalized[i * Cols + j + k];
-				}
-				else
-				{
-					sum = 0.;
-					break;
-				}
-				
-			}
-			parrImage[i * Cols + j] = sum / sqrt((float)width);
-		}
-	}
-}
 //----------------------------------------------------
 __global__
 void fdmt_normalization(fdmt_type_* d_arr, fdmt_type_* d_norm, const int len, float* d_pOutArray)

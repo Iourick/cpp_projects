@@ -18,8 +18,6 @@
 #include <fdmt_gpu.cuh>
 
 
-
-
 using namespace std;
 enum TYPE_OF_PROCESSOR
 {
@@ -27,7 +25,7 @@ enum TYPE_OF_PROCESSOR
 	, GPU
 };
 
-char strInpFolder[] = "..//FDMT_TESTS//2048";
+char strInpFolder[] = "..//FDMT_TESTS//512";
 char strPathOutImageNpyFile_gpu[] = "out_image_GPU.npy";
 const bool BDIM_512_1024 = true;
 TYPE_OF_PROCESSOR PROCESSOR = GPU;
@@ -332,6 +330,28 @@ int main(int argc, char** argv)
 	/*iImRows = 4096;
 	iImCols = 1 << 16;
 	iMaxDT = iImRows/2;*/
+
+	/*char file[] = "file512.bin";
+	FILE* outFile = fopen(file, "wb");
+	if (!outFile) {
+		std::cerr << "Error opening file for writing\n";
+		return 1;
+	}
+	fwrite(h_parrImage, sizeof(float), iImRows * iImCols, outFile);
+	fclose(outFile);
+
+	FILE* inFile = fopen(file, "rb");
+	if (!inFile) {
+		std::cerr << "Error opening file for reading\n";
+
+		return 1;
+	}
+	fread(h_parrImage, sizeof(float), iImRows * iImCols, inFile);
+	fclose(inFile);*/
+
+
+
+
 	fdmt_type_* u_parrImage = NULL;
 	fdmt_type_* u_parrImOut = NULL;
 	float tsamp = 1.0;
@@ -391,7 +411,7 @@ int main(int argc, char** argv)
 	
 	std::cout << "timing begin" << std::endl;
 	// 3. calculations		
-	int num = 500;
+	int num = 50;
 	auto start = std::chrono::high_resolution_clock::now();
 
 	for (int i = 0; i < num; ++i)

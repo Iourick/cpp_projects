@@ -3,6 +3,7 @@
 class COutChunkHeader
 {
 public:
+	~COutChunkHeader() ;
 	COutChunkHeader();
 	COutChunkHeader(const  COutChunkHeader& R);
 	COutChunkHeader& operator=(const COutChunkHeader& R);

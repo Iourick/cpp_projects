@@ -11,7 +11,7 @@
 using namespace std;
 
 class COutChunkHeader;
-class CFragment;
+
 class CFdmtU;
 class CTelescopeHeader;
  
